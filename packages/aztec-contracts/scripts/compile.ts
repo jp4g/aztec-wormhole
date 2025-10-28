@@ -21,7 +21,6 @@ async function main() {
         console.log("Generating TypeScript bindings...");
         await execCommand("aztec", ["codegen", "target", "--outdir", "target", "-f"]);
 
-        // Move artifacts
         const artifactsDir = join(contractsDir, "src", "artifacts");
         console.log("Moving artifacts to lib...")
         await copyFileWithLog(

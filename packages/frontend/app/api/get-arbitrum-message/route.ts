@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Set up connection to the blockchain
-    const provider = new ethers.JsonRpcProvider(
+    const provider = new ethers.providers.JsonRpcProvider(
       process.env.NEXT_PUBLIC_RPC_URL || "http://localhost:8545"
     );
     
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Create a contract interface for encoding/decoding
-      const contractInterface = new ethers.Interface(vaultGettersABI);
+      const contractInterface = new ethers.utils.Interface(vaultGettersABI);
       
       // Convert txHash to bytes32 format for the contract call
       const bytes32TxHash = to32ByteHex(txHash);

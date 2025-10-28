@@ -9,6 +9,7 @@ const execPromise = promisify(exec);
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("0")
     // Parse the donation data from request
     let donationData = null;
     try {

@@ -1,17 +1,26 @@
 // src/send-message.mjs
 import { getInitialTestAccountsWallets } from '@aztec/accounts/testing';
-import { AztecAddress, Contract, createPXEClient, loadContractArtifact, waitForPXE } from '@aztec/aztec.js';
-import EmitterJSON from "../artifacts/emitter-WormholeEmitter.json" assert { type: "json" };
-import { TokenContract } from '@aztec/noir-contracts.js/Token';
+import { AztecAddress, Contract, createAztecNodeClient, createPXEClient, loadContractArtifact, waitForPXE } from '@aztec/aztec.js';
+import EmitterJSON from "../artifacts/emitter/Emitter.json" assert { type: "json" };
+import WormholeJSON from "../artifacts/wormhole/Wormhole.json" assert { type: "json" };
+
+import { TokenContractArtifact } from '@aztec/noir-contracts.js/Token';
+// import { WormholeEmitterContract } from "../artifacts/emitter/Emitter.ts";
 import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { MockGuardians, MockEmitter } from '@certusone/wormhole-sdk/lib/cjs/mock/index.js';
+import { MockGuardians, MockEmitter } from './mock-wormhole.mjs';
 import fetch from 'node-fetch';
 
 const EmitterContractArtifact = loadContractArtifact(EmitterJSON);
+const WormholeContractArtifact = loadContractArtifact(WormholeJSON);
 
-const { PXE_URL = 'http://localhost:8090' } = process.env;
+const {
+  PXE_URL = 'http://localhost:8080',
+  NEXT_PUBLIC_TOKEN_ADDRESS,
+  NEXT_PUBLIC_EMITTER_ADDRESS,
+  NEXT_PUBLIC_WORMHOLE_ADDRESS 
+} = process.env;
 
 // Read donation data passed from the API route
 function getDonationData() {
@@ -112,7 +121,7 @@ function createMessageArrays(donationAddress, arbChainId, verificationData) {
 // Guardian private key for signing VAAs in sandbox mode
 const GUARDIAN_PRIVATE_KEY = "cfb12303a19cde580bb4dd771639b0d26bc68353645571a8cff516ab2ee113a0";
 
-async function signAndSubmitVAA(tx, emitterAddress, chainId, payload) {
+async function signAndSubmitVAA(tx, NEXT_PUBLIC_EMITTER_ADDRESS, chainId, payload) {
   try {
     console.log("\n=== Signing VAA with MockGuardians ===");
 
@@ -122,7 +131,7 @@ async function signAndSubmitVAA(tx, emitterAddress, chainId, payload) {
 
     // Create mock emitter
     const mockEmitter = new MockEmitter(
-      emitterAddress.toString().replace('0x', ''),
+      NEXT_PUBLIC_EMITTER_ADDRESS.toString().replace('0x', ''),
       chainId,
       Number(sequence)
     );
@@ -180,6 +189,7 @@ async function main() {
   
   // Connect to PXE
   const pxe = createPXEClient(PXE_URL);
+  const node = createAztecNodeClient(PXE_URL);
   await waitForPXE(pxe);
   console.log(`Connected to PXE at ${PXE_URL}`);
 
@@ -192,29 +202,22 @@ async function main() {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
   // Load addresses from file or use hardcoded defaults
-  let addresses;
-  try {
-    const addressesPath = join(__dirname, '../assets/addresses.json');
-    addresses = JSON.parse(readFileSync(addressesPath, 'utf8'));
-    console.log("Using addresses from addresses.json:", addresses);
-  } catch (error) {
-    // Fallback to hardcoded addresses
-    addresses = { 
-      emitter: "0x054aba4606088823379606da36c8f6c770bcfe1b38ed663256bec4eca8e0125c" 
-    };
-    console.log("Using hardcoded addresses:", addresses);
-  }
 
-  const emitterAddress = AztecAddress.fromString(addresses.emitter);
-  console.log(`Using emitter at ${emitterAddress.toString()}`);
+  const emitterAddress = AztecAddress.fromString(NEXT_PUBLIC_EMITTER_ADDRESS);
+  console.log(`Using emitter at ${NEXT_PUBLIC_EMITTER_ADDRESS}`);
 
   // EXISTING WORMHOLE AND TOKEN CONTRACT ADDRESSES
-  const wormhole_address = AztecAddress.fromString("0x1320a7c89797e4506b683fcc547acb7f02a809bd1b3a967a3dfe18b7d3f38669");
-  const token_address = "0x0dc025163fe73041b970e9a26905fb41358ad14ef8de84e38746679f210d300e";
 
   console.log("Getting token contract...");
-  const token = await TokenContract.at(token_address, ownerWallet);
-
+  const tokenInstance = await node.getContract(NEXT_PUBLIC_TOKEN_ADDRESS);
+  console.log("A")
+  await pxe.registerContract({
+    instance: tokenInstance,
+    artifact: TokenContractArtifact
+  });
+  console.log("B")
+  const token = await Contract.at(NEXT_PUBLIC_TOKEN_ADDRESS, TokenContractArtifact, ownerWallet);
+  console.log("C")
   const noncePath = join(__dirname, '../assets/nonce.json');
   const nonce_file_data = JSON.parse(readFileSync(noncePath, 'utf8'));
 
@@ -241,7 +244,7 @@ async function main() {
   console.log("Generating private authwit for token transfer...");
   const wormholeWitness = await ownerWallet.createAuthWit(
     {
-      caller: wormhole_address,
+      caller: emitterAddress,
       action: tokenTransferAction
     },
     true
@@ -262,7 +265,17 @@ async function main() {
   });
 
   console.log("Getting emitter contract...");
-  const contract = await Contract.at(emitterAddress, EmitterContractArtifact, ownerWallet);
+  const emitterInstance = await node.getContract(emitterAddress);
+  await pxe.registerContract({
+    instance: emitterInstance,
+    artifact: EmitterContractArtifact
+  });
+  const wormholeInstance = await node.getContract(AztecAddress.fromString(NEXT_PUBLIC_WORMHOLE_ADDRESS));
+  await pxe.registerContract({
+    instance: wormholeInstance,
+    artifact: WormholeContractArtifact
+  });
+  const emitterContract = await Contract.at(emitterAddress, EmitterContractArtifact, ownerWallet);
   
   // The vault address we want to appear in the logs
   const targetVaultAddress = "0x009cbB8f91d392856Cb880d67c806Aa731E3d686";
@@ -275,6 +288,7 @@ async function main() {
   const arb_chain_id_as_u8_31 = chainIdToUint8Array(arb_chain_id);
 
   // Create message arrays with user data (5 arrays of 31 bytes each)
+  console.log("Donation data: ", donationData);
   const msgArrays = createMessageArrays(vault_address, arb_chain_id_as_u8_31, donationData);
 
   // Log what's going to be sent
@@ -289,14 +303,24 @@ async function main() {
   console.log("Calling emitter verify_and_publish...");
 
   try {
-    const tx = await contract.methods.verify_and_publish(
-      null,                 // No proofs
+    console.log("Inputs: ");
+    console.log("Msg arrays: ", msgArrays);
+    console.log("Amount: ", userAmount);
+    console.log("Token nonce: ", token_nonce);
+    console.log("keys", Object.keys(emitterContract.methods));
+    const built = await emitterContract.methods.bridge(
       msgArrays,            // Message arrays (5 arrays of 31 bytes each)
-      wormhole_address,     // Wormhole contract address
-      token_address,        // Token contract address
       BigInt(userAmount),   // Amount
       token_nonce           // Token nonce
-    ).send({ authWitnesses: [wormholeWitness, donationWitness] }).wait();
+    );
+    console.log("built tx");
+    const sent = await built.send({
+      privateAuthWitnesses: [donationWitness, wormholeWitness],
+      from: ownerAddress
+    });
+    console.log("sent tx");
+    const tx = await sent.wait();
+    console.log("settled tx");
 
     console.log("Transaction sent! Hash:", tx.txHash);
     console.log("Block number:", tx.blockNumber);
@@ -309,7 +333,7 @@ async function main() {
     const payload = Buffer.concat(msgArrays.map(arr => Buffer.from(arr)));
     await signAndSubmitVAA(
       tx,
-      emitterAddress,
+      NEXT_PUBLIC_EMITTER_ADDRESS,
       56, // Aztec chain ID
       payload
     );

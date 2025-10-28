@@ -12,6 +12,12 @@
       "node": "./dist/node/index.js",
       "browser": "./dist/browser/index.js",
       "default": "./dist/node/index.js"
+    },
+    "./artifacts": {
+      "types": "./dist/types/artifacts/index.d.ts",
+      "node": "./dist/node/artifacts/index.js",
+      "browser": "./dist/browser/artifacts/index.js",
+      "default": "./dist/node/artifacts/index.js"
     }
   },
   "dependencies": {
@@ -31,11 +37,12 @@
   },
   "scripts": {
     "build:contracts": "bun run ./scripts/compile.ts",
-    "build:node": "bun build ./src/index.ts --outdir ./dist/node --target=node",
-    "build:browser": "bun build ./src/index.ts --outdir ./dist/browser --target=browser",
-    "build:types": "tsc --declaration --emitDeclarationOnly --outDir ./dist/types",
+    "build:node": "bun build ./src/index.ts ./src/artifacts/index.ts --outdir ./dist/node --target=node --sourcemap",
+    "build:browser": "bun build ./src/index.ts ./src/artifacts/index.ts --outdir ./dist/browser --target=browser --sourcemap",
+    "build:types": "tsc -p ./tsconfig.types.json",
     "build": "bun run build:contracts && bun run build:ts",
     "build:ts": "bun run build:node && bun run build:browser && bun run build:types",
-    "deploy": "bun run ./scripts/deploy.ts"
+    "deploy": "bun run ./scripts/deploy.ts",
+    "mint": "bun run ./scripts/mint.ts"
   }
 }

@@ -85,28 +85,28 @@ services:
     networks:
       - aztec-network
 
-  frontend:
-    container_name: aztec-wormhole-frontend
-    profiles:
-      - sandbox
-    build:
-      context: ./packages/frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_RPC_URL=http://anvil:8545
-      - NEXT_PUBLIC_PXE_URL=http://aztec-sandbox-node:8080
-      - NEXT_PUBLIC_CONTRACT_ADDRESS=0x009cbB8f91d392856Cb880d67c806Aa731E3d686
-      - MOCK_SPY_URL=http://mock-spy:8081
-      - PXE_URL=http://aztec-sandbox-node:8080
-    depends_on:
-      - anvil
-      - aztec-sandbox-node
-      - mock-spy
-    restart: unless-stopped
-    networks:
-      - aztec-network
+  # frontend:
+  #   container_name: aztec-wormhole-frontend
+  #   profiles:
+  #     - sandbox
+  #   build:
+  #     context: ./packages/frontend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_RPC_URL=http://anvil:8545
+  #     - NEXT_PUBLIC_PXE_URL=http://aztec-sandbox-node:8080
+  #     - NEXT_PUBLIC_CONTRACT_ADDRESS=0x009cbB8f91d392856Cb880d67c806Aa731E3d686
+  #     - MOCK_SPY_URL=http://mock-spy:8081
+  #     - PXE_URL=http://aztec-sandbox-node:8080
+  #   depends_on:
+  #     - anvil
+  #     - aztec-sandbox-node
+  #     - mock-spy
+  #   restart: unless-stopped
+  #   networks:
+  #     - aztec-network
 
   # Real Wormhole Spy + Relayer for Testnet
   # Uncomment these services when you're ready to use testnet
