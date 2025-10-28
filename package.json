@@ -9,7 +9,9 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "sandbox": "docker compose --profile sandbox up",
+    "testnet": "docker compose --profile testnet up"
   },
   "workspaces": [
     "packages/*",
