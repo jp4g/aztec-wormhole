@@ -1,0 +1,10 @@
+{
+  "emitter-WormholeEmitter.json": {
+    "contractName": "WormholeEmitter",
+    "hash": "4cb7bffc523044c36485105307e5c3b6925661db685994cbc0cea57568744f3b"
+  },
+  "wormhole_contracts-Wormhole.json": {
+    "contractName": "Wormhole",
+    "hash": "8b7fb77c3b31a77b464a5d5328479f4ea01a26005641dcc29c2eae1612d27359"
+  }
+}

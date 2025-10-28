@@ -8,8 +8,8 @@ const geistSans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ZKPassport SDK Example",
-  description: "Example of using the ZKPassport SDK for identity verification",
+  title: "Cross-Chain Donation Platform",
+  description: "Make donations using secure cross-chain transfers from Aztec to Arbitrum",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

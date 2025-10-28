@@ -1,39 +1,19 @@
 "use client"
 import { useEffect, useRef, useState } from "react"
-import { ZKPassport, type ProofResult, EU_COUNTRIES, type QueryResult, type QueryResultErrors } from "@zkpassport/sdk"
-import QRCode from "react-qr-code"
-import { ZKPassportHelper, type ContractProofData } from "./ZKPassportHelper" // Adjust the import path as needed
 
 export default function Home() {
-  // Only keep essential state variables
-  const [message, setMessage] = useState("")
-  const [queryUrl, setQueryUrl] = useState("")
-  const [formattedProofs, setFormattedProofs] = useState<ContractProofData | null>(null) // Store formatted proofs
-  const [donationAmount, setDonationAmount] = useState<number | "">("")  // No default amount - user must enter
-  const [submittedAmount, setSubmittedAmount] = useState<number | null>(null) // Track the actually submitted amount
-  
-  // UI state variables
-  const [requestInProgress, setRequestInProgress] = useState(false)
+  // State variables
+  const [donationAmount, setDonationAmount] = useState<number | "">("")
+  const [submittedAmount, setSubmittedAmount] = useState<number | null>(null)
   const [txHash, setTxHash] = useState("")
   const [txStatus, setTxStatus] = useState("")
-  const [receivedDonation, setReceivedDonation] = useState<number | null>(null) // Just store the received donation
+  const [receivedDonation, setReceivedDonation] = useState<number | null>(null)
   const [isPolling, setIsPolling] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const [showQRCode, setShowQRCode] = useState(true)
-  
-  // Refs
-  const zkPassportRef = useRef<ZKPassport | null>(null)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const collectedProofsRef = useRef<ProofResult[]>([]) // Store collected proofs
-  const lockedDonationAmountRef = useRef<number | null>(null) // Lock the donation amount
 
-  // Initialize ZKPassport on component mount
-  useEffect(() => {
-    if (!zkPassportRef.current) {
-      zkPassportRef.current = new ZKPassport(window.location.hostname)
-    }
-  }, [])
+  // Refs
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Clean up polling interval on component unmount
   useEffect(() => {
@@ -44,267 +24,59 @@ export default function Home() {
     }
   }, [])
 
-  // Create the ZKPassport verification request
-  const createRequest = async () => {
-    if (!zkPassportRef.current) {
-      return
-    }
-
-    // Validate donation amount before proceeding
+  // Submit donation directly without verification
+  const submitDonation = async () => {
+    // Validate donation amount
     if (!donationAmount || donationAmount <= 0 || donationAmount > 254) {
       setError("Please enter a valid donation amount between 1 and 254")
       return
     }
-    
-    // LOCK the donation amount immediately when verification starts
+
+    // Lock the donation amount
     const lockedAmount = Number(donationAmount)
-    lockedDonationAmountRef.current = lockedAmount
     setSubmittedAmount(lockedAmount)
-    
-    // Reset all state
-    setMessage("")
-    setQueryUrl("")
+
+    // Reset state
     setTxHash("")
     setTxStatus("")
     setReceivedDonation(null)
     setIsPolling(false)
-    setShowQRCode(true)
     setError("")
-    setFormattedProofs(null)
-    collectedProofsRef.current = [] // Reset collected proofs
 
     try {
       setIsLoading(true)
-      
-      // Create the verification request
-      const serviceScope = "obsidion-wallet-personhood"
-      const queryBuilder = await zkPassportRef.current.request({
-        name: "Obsidion Wallet",
-        logo: window.location.origin + "/wallet-logo.png",
-        purpose: "Prove your personhood and EU citizenship to make a verified donation",
-        scope: serviceScope,
-        mode: "fast",
-        devMode: true,
+      setTxStatus(`Processing your donation of ${lockedAmount} tokens...`)
+
+      const response = await fetch("/api/send-message", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ amount: lockedAmount })
       })
 
-      // Build the query with your requirements
-      const { 
-        url, 
-        requestId,
-        onRequestReceived, 
-        onGeneratingProof, 
-        onProofGenerated, 
-        onResult, 
-        onReject, 
-        onError 
-      } = queryBuilder
-        .in("issuing_country", [...EU_COUNTRIES, "Zero Knowledge Republic"])
-        .disclose("firstname")
-        .gte("age", 18)
-        .disclose("document_type")
-        .done()
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`)
+      }
 
-      setQueryUrl(url)
-      console.log("Verification URL:", url)
-      console.log("Request ID:", requestId)
+      const data = await response.json()
 
-      setRequestInProgress(true)
-
-      onRequestReceived(() => {
-        console.log("QR code scanned - Request received")
-        setMessage("Request received")
-      })
-
-      onGeneratingProof(() => {
-        console.log("Generating proof")
-        setMessage("Generating proof...")
-      })
-
-      onProofGenerated((proofResult: ProofResult) => {
-        console.log("Proof generated:", proofResult)
-        setMessage(`Proof received: ${proofResult.name}`)
-        
-        // Collect the proof for later use
-        collectedProofsRef.current.push(proofResult)
-        console.log(`Collected ${collectedProofsRef.current.length} proofs so far`)
-      })
-
-      // Handle query results and format proofs
-      onResult(async (resultData) => {
-        const { 
-          result, 
-          uniqueIdentifier, 
-          verified: verificationResult, 
-          queryResultErrors 
-        } = resultData;
-        
-        console.log("Full result data keys:", Object.keys(resultData))
-        console.log("Result of the query", result)
-        console.log("Query result errors", queryResultErrors)
-        console.log("Verification result:", verificationResult)
-        console.log("Unique identifier:", uniqueIdentifier)
-        
-        // Try to find proofs in different possible locations
-        let proofs: ProofResult[] | null = (resultData as Record<string, unknown>).proofs as ProofResult[] || (resultData as Record<string, unknown>).proof as ProofResult[] || (resultData as Record<string, unknown>).proofResults as ProofResult[] || null;
-        console.log("Raw proofs received:", proofs)
-        console.log("Proofs type:", typeof proofs)
-        
-        // If proofs is not directly available, use the collected proofs from onProofGenerated
-        if (!proofs && collectedProofsRef.current.length > 0) {
-          proofs = collectedProofsRef.current;
-          console.log("Using collected proofs from onProofGenerated:", (proofs as ProofResult[]).length, "proofs")
-        }
-
-        // Extract data from results (only for sending to API, not for display)
-        const firstName = result?.firstname?.disclose?.result || ""
-        const isEUCitizen = result?.issuing_country?.in?.result || false
-        const isOver18 = result?.age?.gte?.result || false
-        const documentType = result?.document_type?.disclose?.result || ""
-        
-        setMessage("ZK proof generation completed")
-        setRequestInProgress(false)
-        
-        // Auto close QR code after verification
-        setTimeout(() => setShowQRCode(false), 1000)
-        
-        // Format proofs using ZKPassportHelper
-        let contractProofData = null
-        if (proofs && Array.isArray(proofs) && proofs.length > 0) {
-          console.log("Formatting proofs for contract...")
-          console.log("Number of proofs to format:", proofs.length)
-          console.log("Proof names:", proofs.map((p) => p.name))
-          
-          try {
-            contractProofData = await ZKPassportHelper.formatProofsForContract(proofs)
-            if (contractProofData) {
-              console.log("Successfully formatted proofs:", contractProofData)
-              setFormattedProofs(contractProofData)
-            } else {
-              console.error("Failed to format proofs - received null/undefined")
-            }
-          } catch (formatError) {
-            console.error("Error formatting proofs:", formatError)
-          }
-        } else {
-          console.log("No proofs received to format")
-          console.log("Collected proofs count:", collectedProofsRef.current.length)
-        }
-        
-        // Prepare verification data for sending to the API
-        // Convert BigInt values to strings for JSON serialization
-        const serializableProofData = contractProofData ? {
-          vkeys: {
-            vkey_a: contractProofData.vkeys.vkey_a.map(v => v.toString()),
-            vkey_b: contractProofData.vkeys.vkey_b.map(v => v.toString()),
-            vkey_c: contractProofData.vkeys.vkey_c.map(v => v.toString()),
-            vkey_d: contractProofData.vkeys.vkey_d.map(v => v.toString()),
-            vkey_e: contractProofData.vkeys.vkey_e.map(v => v.toString()),
-            vkey_f: contractProofData.vkeys.vkey_f.map(v => v.toString()),
-          },
-          proofs: {
-            proof_a: contractProofData.proofs.proof_a.map(p => p.toString()),
-            proof_b: contractProofData.proofs.proof_b.map(p => p.toString()),
-            proof_c: contractProofData.proofs.proof_c.map(p => p.toString()),
-            proof_d: contractProofData.proofs.proof_d.map(p => p.toString()),
-            proof_e: contractProofData.proofs.proof_e.map(p => p.toString()),
-            proof_f: contractProofData.proofs.proof_f.map(p => p.toString()),
-          },
-          vkey_hashes: {
-            vkey_hash_a: contractProofData.vkey_hashes.vkey_hash_a.toString(),
-            vkey_hash_b: contractProofData.vkey_hashes.vkey_hash_b.toString(),
-            vkey_hash_c: contractProofData.vkey_hashes.vkey_hash_c.toString(),
-            vkey_hash_d: contractProofData.vkey_hashes.vkey_hash_d.toString(),
-            vkey_hash_e: contractProofData.vkey_hashes.vkey_hash_e.toString(),
-            vkey_hash_f: contractProofData.vkey_hashes.vkey_hash_f.toString(),
-          },
-          public_inputs: {
-            input_a: contractProofData.public_inputs.input_a.map(i => i.toString()),
-            input_b: contractProofData.public_inputs.input_b.map(i => i.toString()),
-            input_c: contractProofData.public_inputs.input_c.map(i => i.toString()),
-            input_d: contractProofData.public_inputs.input_d.map(i => i.toString()),
-            input_e: contractProofData.public_inputs.input_e.map(i => i.toString()),
-            input_f: contractProofData.public_inputs.input_f.map(i => i.toString()),
-          },
-        } : null;
-
-        // Use the LOCKED donation amount that was captured at the start
-        // This ensures the amount cannot be changed by user after verification starts
-        const finalDonationAmount = lockedDonationAmountRef.current!
-        
-        const verificationData = {
-          firstName: firstName,
-          isOver18: isOver18,
-          isEUCitizen: isEUCitizen,
-          documentType: documentType,
-          uniqueIdentifier: uniqueIdentifier || "",
-          amount: finalDonationAmount, // Use the locked amount
-          formattedProofs: serializableProofData // Include serializable formatted proofs
-        }
-        
-        console.log("Sending verification data to API:", verificationData)
-        
-        // Send data to API
-        setTxStatus(`Processing your verified donation of ${finalDonationAmount} tokens...`)
-        setTxHash("")
-        
-        try {
-          const response = await fetch("/api/send-message", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(verificationData)
-          })
-          
-          if (!response.ok) {
-            throw new Error(`Error: ${response.status}`)
-          }
-          
-          const data = await response.json()
-          
-          if (data.success) {
-            setTxStatus(`Your verified donation of ${finalDonationAmount} tokens has been submitted!`)
-            setTxHash(data.txHash)
-            // Start polling automatically once we have a txHash
-            startPollingDonation(data.txHash)
-          } else {
-            setTxStatus(`Error: ${data.error}`)
-            // Don't reset submittedAmount on API error - keep it for debugging
-          }
-        } catch (error) {
-          console.error("Error sending verification data to API:", error)
-          setTxStatus(`Error: ${error instanceof Error ? error.message : "Unknown error"}`)
-          // Don't reset submittedAmount on API error - keep it for debugging
-        }
-      })
-
-      onReject(() => {
-        console.log("User rejected")
-        setMessage("User rejected the request")
-        setRequestInProgress(false)
-        setIsLoading(false)
-        setSubmittedAmount(null) // Reset submitted amount on rejection
-        lockedDonationAmountRef.current = null // Reset locked amount
-      })
-
-      onError((error: unknown) => {
-        console.error("ZKPassport error:", error)
-        setMessage("An error occurred")
-        setRequestInProgress(false)
-        setIsLoading(false)
-        setSubmittedAmount(null) // Reset submitted amount on error
-        lockedDonationAmountRef.current = null // Reset locked amount
-        setError("Failed to complete ZKPassport verification")
-      })
+      if (data.success) {
+        setTxStatus(`Your donation of ${lockedAmount} tokens has been submitted!`)
+        setTxHash(data.txHash)
+        // Start polling automatically once we have a txHash
+        startPollingDonation(data.txHash)
+      } else {
+        setTxStatus(`Error: ${data.error}`)
+      }
 
       setIsLoading(false)
-    } catch (err) {
-      console.error("Error initializing ZKPassport:", err)
-      setError("Failed to initialize ZKPassport verification")
+    } catch (error) {
+      console.error("Error sending donation to API:", error)
+      setTxStatus(`Error: ${error instanceof Error ? error.message : "Unknown error"}`)
+      setError("Failed to submit donation")
       setIsLoading(false)
-      setRequestInProgress(false)
-      setSubmittedAmount(null) // Reset submitted amount on error
-      lockedDonationAmountRef.current = null // Reset locked amount
+      setSubmittedAmount(null)
     }
   }
 
@@ -379,9 +151,6 @@ export default function Home() {
 
   // Reset function to clear all state for a new donation
   const resetForNewDonation = () => {
-    setMessage("")
-    setQueryUrl("")
-    setFormattedProofs(null)
     setDonationAmount("")
     setSubmittedAmount(null)
     setTxHash("")
@@ -390,11 +159,7 @@ export default function Home() {
     setIsPolling(false)
     setIsLoading(false)
     setError("")
-    setShowQRCode(true)
-    setRequestInProgress(false)
-    collectedProofsRef.current = []
-    lockedDonationAmountRef.current = null // Reset locked amount
-    
+
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current)
       pollingIntervalRef.current = null
@@ -406,14 +171,14 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-800 mb-4">💝 Verified Donation Platform</h1>
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">💝 Cross-Chain Donation Platform</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Make verified donations using zero-knowledge identity proofs and secure cross-chain transfers
+            Make donations using secure cross-chain transfers from Aztec to Arbitrum
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - QR Code and Controls */}
+          {/* Left Column - Donation Controls */}
           <div className="space-y-6">
             {/* Donation Amount Input */}
             <div className="bg-white rounded-xl shadow-lg p-6">
@@ -432,10 +197,10 @@ export default function Home() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter donation amount (1-254)"
                   required
-                  disabled={requestInProgress || isLoading} // Disable during processing
+                  disabled={isLoading}
                 />
                 <p className="text-xs text-gray-500">
-                  Your donation will be securely processed after identity verification (1-254 tokens)
+                  Your donation will be securely processed via cross-chain transfer (1-254 tokens)
                 </p>
                 {submittedAmount === null && !donationAmount && (
                   <p className="text-xs text-red-500">
@@ -448,7 +213,7 @@ export default function Home() {
                       🔒 Processing donation: {submittedAmount} tokens
                     </p>
                     <p className="text-xs text-blue-600">
-                      Amount is locked during verification and transaction
+                      Amount is locked during transaction
                     </p>
                   </div>
                 )}
@@ -465,43 +230,13 @@ export default function Home() {
               </div>
             </div>
 
-            {/* QR Code Section */}
+            {/* Donation Actions */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">🔄 Identity Verification</h2>
-
-              {showQRCode && queryUrl ? (
-                <div className="text-center">
-                  <div className="bg-gray-50 p-4 rounded-lg inline-block border-2 border-dashed border-gray-300">
-                    <QRCode value={queryUrl} size={180} />
-                  </div>
-                  <p className="text-sm text-gray-500 mt-3">Scan this QR code with your ZKPassport app</p>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="w-40 h-40 mx-auto bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-                    <div className="text-center">
-                      <div className="text-3xl mb-2">📱</div>
-                      <p className="text-gray-500 text-sm">Start verification</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Status Message */}
-              {message && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center">
-                    <span className="text-blue-600 mr-2">
-                      {requestInProgress ? "⏳" : "✅"}
-                    </span>
-                    <span className="text-blue-800 font-medium">{message}</span>
-                  </div>
-                </div>
-              )}
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">🚀 Submit Donation</h2>
 
               {/* Error Message */}
               {error && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-center">
                     <span className="text-red-600 mr-2">⚠️</span>
                     <span className="text-red-800 font-medium">{error}</span>
@@ -509,16 +244,16 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Action Button */}
-              <div className="mt-4 space-y-2">
+              {/* Action Buttons */}
+              <div className="space-y-2">
                 <button
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={createRequest}
-                  disabled={requestInProgress || isLoading || !donationAmount}
+                  onClick={submitDonation}
+                  disabled={isLoading || !donationAmount}
                 >
-                  {requestInProgress || isLoading ? "🔄 Processing..." : "💝 Verify Identity & Donate"}
+                  {isLoading ? "🔄 Processing..." : "💝 Send Donation"}
                 </button>
-                
+
                 {/* Reset button for new donation */}
                 {(receivedDonation !== null || error) && (
                   <button
@@ -530,22 +265,6 @@ export default function Home() {
                 )}
               </div>
             </div>
-
-            {/* ZK Proofs Status */}
-            {formattedProofs && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">🔐 Identity Verified</h2>
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-start">
-                    <span className="text-lg mr-2">✅</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-green-800 mb-1">Zero-Knowledge Proof Generated</p>
-                      <p className="text-xs text-green-600">Your identity has been verified without revealing personal data</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Right Column - Donation Status and Results */}

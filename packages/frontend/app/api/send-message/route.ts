@@ -9,39 +9,30 @@ const execPromise = promisify(exec);
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse the verification data from request
-    let verificationData = null;
+    // Parse the donation data from request
+    let donationData = null;
     try {
       const requestData = await request.json();
-      verificationData = Object.keys(requestData).length > 0 ? requestData : {};
+      donationData = Object.keys(requestData).length > 0 ? requestData : {};
     } catch {
-      verificationData = {};
+      donationData = {};
     }
-    
-    // Check if we have any verification data
-    const hasData = Object.keys(verificationData).length > 0;
-    const hasProofs = verificationData && verificationData.formattedProofs;
-    
-    if (!hasData) {
+
+    console.log("1")
+    // Check if we have donation data
+    const hasData = Object.keys(donationData).length > 0;
+
+    if (!hasData || !donationData.amount) {
       return NextResponse.json({
         success: false,
-        error: "No verification data provided"
+        error: "No donation amount provided"
       }, { status: 400 });
     }
-    
-    // Encode the verification data for safe command line transport
+
+    // Encode the donation data for safe command line transport
     try {
-      // Create a safe copy of the verification data that handles BigInt values
-      const safeVerificationData = JSON.parse(
-        JSON.stringify(verificationData, (key, value) => {
-          if (typeof value === 'bigint') {
-            return value.toString();
-          }
-          return value;
-        })
-      );
-      
-      const encodedData = Buffer.from(JSON.stringify(safeVerificationData)).toString('base64');
+      console.log("2")
+      const encodedData = Buffer.from(JSON.stringify(donationData)).toString('base64');
       
       // Path to your existing script
       const scriptPath = path.join(process.cwd(), '/app/scripts/send-message.mjs');
@@ -54,18 +45,18 @@ export async function POST(request: NextRequest) {
           error: `Script not found at path: ${scriptPath}`
         }, { status: 500 });
       }
+      console.log("3")
       
       try {
-        // Execute your script with the verification data as an environment variable
+        // Execute your script with the donation data as an environment variable
         const { stdout, stderr } = await execPromise(`node ${scriptPath}`, {
           timeout: 120000, // 2 minute timeout
           env: {
             ...process.env,
-            VERIFICATION_DATA: encodedData,
-            HAS_MEANINGFUL_DATA: "true",
-            HAS_ZK_PROOFS: hasProofs ? "true" : "false"
+            DONATION_DATA: encodedData
           }
         });
+        console.log("4")
         
         if (stderr && !stderr.includes("deprecated in import statements")) {
           console.warn("Script warnings:", stderr);
@@ -89,31 +80,24 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             success: true,
             txHash: txHash,
-            message: hasProofs 
-              ? "Verification data and ZK proofs sent to contract successfully" 
-              : "Verification data sent to contract successfully",
-            hasZKProofs: hasProofs
+            message: "Donation sent to contract successfully"
           });
         } else {
           // If we can't find a transaction hash but the script completed successfully
-          if (stdout.includes("Calling emitter verify and publish") && 
+          if (stdout.includes("Calling emitter verify_and_publish") &&
               stdout.includes("blockNumber:")) {
             return NextResponse.json({
               success: true,
-              message: hasProofs 
-                ? "Verification and ZK proofs sent successfully, but transaction hash could not be extracted"
-                : "Verification sent successfully, but transaction hash could not be extracted",
-              rawOutput: stdout.substring(stdout.length - 500),
-              hasZKProofs: hasProofs
+              message: "Donation sent successfully, but transaction hash could not be extracted",
+              rawOutput: stdout.substring(stdout.length - 500)
             });
           }
-          
+
           console.error("Could not find transaction hash in output");
           return NextResponse.json({
             success: false,
             error: "Could not extract transaction hash from output",
-            rawOutput: stdout.substring(stdout.length - 500),
-            hasZKProofs: hasProofs
+            rawOutput: stdout.substring(stdout.length - 500)
           }, { status: 500 });
         }
       } catch (error) {
@@ -134,15 +118,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: false,
           error: errorMessage,
-          errorOutput: errorOutput || undefined,
-          hasZKProofs: hasProofs
+          errorOutput: errorOutput || undefined
         }, { status: 500 });
       }
     } catch (jsonError) {
-      console.error("Error converting verification data to JSON:", jsonError);
+      console.error("Error converting donation data to JSON:", jsonError);
       return NextResponse.json({
         success: false,
-        error: `Error converting verification data to JSON: ${jsonError instanceof Error ? jsonError.message : "Unknown error"}`
+        error: `Error converting donation data to JSON: ${jsonError instanceof Error ? jsonError.message : "Unknown error"}`
       }, { status: 500 });
     }
   } catch (error) {
