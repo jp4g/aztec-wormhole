@@ -1,5 +1,5 @@
 {
-  "name": "aztec-wormhole-zkpassport",
+  "name": "aztec-wormhole",
   "version": "1.0.0",
   "description": "Monorepo for Aztec/Wormhole demo with frontend, Foundry, Go relayer, and Noir",
   "private": true,

@@ -1,11 +1,19 @@
 {
-  "name": "wormhole-aztec-contracts",
+  "name": "@aztec-wormhole/contracts",
   "version": "1.0.0",
   "description": "",
   "license": "ISC",
-  "author": "",
-  "type": "commonjs",
-  "main": "index.js",
+  "authors": ["Wormhole", "Nethermind", "Aztec Pioneers"],
+  "main": "./dist/node/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "node": "./dist/node/index.js",
+      "browser": "./dist/browser/index.js",
+      "default": "./dist/node/index.js"
+    }
+  },
   "dependencies": {
     "@types/bun": "latest",
     "@types/jest": "^30.0.0",
@@ -22,6 +30,12 @@
     "jest": "^30.0.5"
   },
   "scripts": {
-    "build": "bun run ./scripts/compile.ts"
+    "build:contracts": "bun run ./scripts/compile.ts",
+    "build:node": "bun build ./src/index.ts --outdir ./dist/node --target=node",
+    "build:browser": "bun build ./src/index.ts --outdir ./dist/browser --target=browser",
+    "build:types": "tsc --declaration --emitDeclarationOnly --outDir ./dist/types",
+    "build": "bun run build:contracts && bun run build:ts",
+    "build:ts": "bun run build:node && bun run build:browser && bun run build:types",
+    "deploy": "bun run ./scripts/deploy.ts"
   }
 }

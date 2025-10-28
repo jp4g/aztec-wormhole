@@ -21,14 +21,14 @@ export async function deployToken(
 
 export async function deployWormholeContract(
     wallet: AccountWallet,
-    chainIds: {aztec: number, evm: number},
+    chainIds: {wormhole: number, evm: number},
     tokenAddress: AztecAddress,
     receiverAddress: AztecAddress = wallet.getAddress(),
     opts: { send: SendMethodOptions, wait?: WaitOpts } = { send: { from: wallet.getAddress() } }
 ): Promise<WormholeContract> {
     return await WormholeContract.deploy(
         wallet,
-        chainIds.aztec,
+        chainIds.wormhole,
         chainIds.evm,
         wallet.getAddress(), // contract owner address
         receiverAddress,

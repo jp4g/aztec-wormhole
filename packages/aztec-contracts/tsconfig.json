@@ -22,5 +22,13 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "emitter",
+    "wormhole",
+    "wormhole-source",
+    "deployments",
+    "target",
+  ]
 }

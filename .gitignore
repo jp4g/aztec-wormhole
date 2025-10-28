@@ -16,6 +16,8 @@ packages/evm-contracts/lib/
 packages/relayer/bin/
 packages/frontend/.next/
 packages/frontend/out/
+codegenCache.json
+dist
 
 # Environment files
 .env

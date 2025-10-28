@@ -6,6 +6,8 @@ import { TokenContract } from '@aztec/noir-contracts.js/Token';
 import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { MockGuardians, MockEmitter } from '@certusone/wormhole-sdk/lib/cjs/mock/index.js';
+import fetch from 'node-fetch';
 
 const EmitterContractArtifact = loadContractArtifact(EmitterJSON);
 
@@ -105,6 +107,67 @@ function createMessageArrays(donationAddress, arbChainId, verificationData) {
   }
   
   return msgArrays;
+}
+
+// Guardian private key for signing VAAs in sandbox mode
+const GUARDIAN_PRIVATE_KEY = "cfb12303a19cde580bb4dd771639b0d26bc68353645571a8cff516ab2ee113a0";
+
+async function signAndSubmitVAA(tx, emitterAddress, chainId, payload) {
+  try {
+    console.log("\n=== Signing VAA with MockGuardians ===");
+
+    // Get the sequence number from the transaction (you may need to extract this from logs)
+    // For now, using a simple incrementing sequence
+    const sequence = BigInt(Date.now()); // Temporary - should come from Wormhole event
+
+    // Create mock emitter
+    const mockEmitter = new MockEmitter(
+      emitterAddress.toString().replace('0x', ''),
+      chainId,
+      Number(sequence)
+    );
+
+    // Publish the message
+    const published = mockEmitter.publishMessage(
+      1, // nonce
+      payload,
+      1  // consistency level
+    );
+
+    // Sign with MockGuardians
+    const guardians = new MockGuardians(0, [GUARDIAN_PRIVATE_KEY]);
+    const signedVAA = guardians.addSignatures(published, [0]);
+
+    console.log(`Signed VAA (${signedVAA.length} bytes)`);
+    console.log(`VAA hex: ${signedVAA.toString('hex').substring(0, 64)}...`);
+
+    // Submit to mock-spy
+    const mockSpyUrl = process.env.MOCK_SPY_URL || 'http://localhost:8081';
+    console.log(`\nSubmitting VAA to mock-spy at ${mockSpyUrl}/submit-vaa`);
+
+    const response = await fetch(`${mockSpyUrl}/submit-vaa`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        vaaBytes: signedVAA.toString('hex')
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Mock-spy returned ${response.status}: ${await response.text()}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ VAA submitted successfully to mock-spy');
+    console.log('Mock-spy will forward to relayer via gRPC');
+
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to sign and submit VAA:', error);
+    throw error;
+  }
 }
 
 async function main() {
@@ -240,7 +303,17 @@ async function main() {
 
     console.log("Transaction completed successfully!");
     console.log(`✅ Amount ${userAmount} sent successfully via cross-chain transaction`);
-    
+
+    // Sign and submit VAA to mock-spy
+    // The payload should be the message arrays converted to bytes
+    const payload = Buffer.concat(msgArrays.map(arr => Buffer.from(arr)));
+    await signAndSubmitVAA(
+      tx,
+      emitterAddress,
+      56, // Aztec chain ID
+      payload
+    );
+
     return tx;
   } catch (txError) {
     console.error("Error sending transaction:", txError);
