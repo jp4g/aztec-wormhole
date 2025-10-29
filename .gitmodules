@@ -1,10 +1,11 @@
-[submodule "packages/evm-contracts/lib/openzeppelin-contracts"]
-	path = packages/evm-contracts/lib/openzeppelin-contracts
+[submodule "packages/evm/lib/openzeppelin-contracts"]
+	path = packages/evm/lib/openzeppelin-contracts
 	url = https://github.com/openzeppelin/openzeppelin-contracts
-[submodule "packages/evm-contracts/lib/wormhole"]
-	path = packages/evm-contracts/lib/wormhole
+[submodule "packages/evm/lib/wormhole"]
+	path = packages/evm/lib/wormhole
 	url = https://github.com/NethermindEth/wormhole
-[submodule "packages/aztec-contracts/wormhole-source"]
-	path = packages/aztec-contracts/contracts/wormhole-source
+
+[submodule "packages/aztec/deps/wormhole"]
+	path = packages/aztec/deps/wormhole
 	url = https://github.com/NethermindEth/wormhole
 	branch = aztec

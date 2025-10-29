@@ -1,0 +1,48 @@
+{
+  "name": "@aztec-wormhole/contracts",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "authors": ["Wormhole", "Nethermind", "Aztec Pioneers"],
+  "main": "./dist/node/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "node": "./dist/node/index.js",
+      "browser": "./dist/browser/index.js",
+      "default": "./dist/node/index.js"
+    },
+    "./artifacts": {
+      "types": "./dist/types/artifacts/index.d.ts",
+      "node": "./dist/node/artifacts/index.js",
+      "browser": "./dist/browser/artifacts/index.js",
+      "default": "./dist/node/artifacts/index.js"
+    }
+  },
+  "dependencies": {
+    "@types/bun": "latest",
+    "@types/jest": "^30.0.0",
+    "typescript": "^5.0.0",
+    "@aztec/aztec.js": "2.0.3",
+    "@aztec/accounts": "2.0.3",
+    "@aztec/constants": "2.0.3",
+    "@aztec/ethereum": "2.0.3",
+    "@aztec/stdlib": "2.0.3",
+    "@aztec/entrypoints": "2.0.3",
+    "@aztec/noir-contracts.js": "2.0.3",
+    "dotenv": "^17.2.1",
+    "@jest/globals": "^30.0.5",
+    "jest": "^30.0.5"
+  },
+  "scripts": {
+    "build:contracts": "bun run ./scripts/compile.ts",
+    "build:node": "bun build ./src/index.ts ./src/artifacts/index.ts --outdir ./dist/node --target=node --sourcemap",
+    "build:browser": "bun build ./src/index.ts ./src/artifacts/index.ts --outdir ./dist/browser --target=browser --sourcemap",
+    "build:types": "tsc -p ./tsconfig.types.json",
+    "build": "bun run build:contracts && bun run build:ts",
+    "build:ts": "bun run build:node && bun run build:browser && bun run build:types",
+    "deploy": "bun run ./scripts/deploy.ts",
+    "mint": "bun run ./scripts/mint.ts",
+  }
+}
