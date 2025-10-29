@@ -1,6 +1,6 @@
 // app/api/get-arbitrum-message/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchArbitrumMessage, normalizeHash } from '../../lib/arbitrum/getMessage';
+import { fetchArbitrumMessage, normalizeHash } from '../../lib/evm/getMessage';
 
 interface MessageRequestBody {
   txHash?: string;

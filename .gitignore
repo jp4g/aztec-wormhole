@@ -18,6 +18,7 @@ packages/frontend/.next/
 packages/frontend/out/
 codegenCache.json
 dist
+target
 
 # Environment files
 .env

@@ -18,7 +18,7 @@ import {
   WormholeContract,
   WormholeEmitterContractArtifact,
   WormholeContractArtifact
-} from '@aztec-wormhole/contracts/artifacts';
+} from '../../../../aztec/dist/types/artifacts';
 import { chainIdToUint8Array, createMessageArrays, hexAddressToUint8Array } from '../wormhole/messagePayload';
 import { signAndSubmitVaa } from '../wormhole/signing';
 import { DonationData, EnvironmentConfig, SendDonationResult } from '../types';
