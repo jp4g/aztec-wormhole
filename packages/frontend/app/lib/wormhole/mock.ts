@@ -2,7 +2,7 @@ import { utils, Wallet } from 'ethers';
 
 const SIGNATURE_PAYLOAD_LEN = 66;
 
-function toBuffer(value) {
+function toBuffer(value: Buffer | Uint8Array | string): Buffer {
   if (Buffer.isBuffer(value)) return value;
   if (value instanceof Uint8Array) return Buffer.from(value);
   if (typeof value === 'string') {
@@ -14,12 +14,12 @@ function toBuffer(value) {
   throw new TypeError('Unsupported value type');
 }
 
-function keccak256(data) {
-  const hexData = '0x' + toBuffer(data).toString('hex');
+function keccak256(data: Buffer | Uint8Array | string): Buffer {
+  const hexData = `0x${toBuffer(data).toString('hex')}`;
   return Buffer.from(utils.arrayify(utils.keccak256(hexData)));
 }
 
-function ethPrivateToPublic(privateKey) {
+function ethPrivateToPublic(privateKey: string): Buffer {
   const walletKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
   const uncompressed = utils.computePublicKey(walletKey, false); // 0x04 + 64 byte key
   const publicKeyBuffer = Buffer.from(uncompressed.slice(2), 'hex'); // drop 0x
@@ -27,28 +27,31 @@ function ethPrivateToPublic(privateKey) {
   return hashed.subarray(12); // last 20 bytes
 }
 
-function ethSignWithPrivate(privateKey, digest) {
+function ethSignWithPrivate(privateKey: string, digest: Buffer | Uint8Array | string) {
   const walletKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
   const wallet = new Wallet(walletKey);
-  const hexDigest = '0x' + toBuffer(digest).toString('hex');
+  const hexDigest = `0x${toBuffer(digest).toString('hex')}`;
   return wallet._signingKey().signDigest(hexDigest);
 }
 
 export class MockGuardians {
-  constructor(setIndex, keys) {
+  private setIndex: number;
+  private readonly signers: Array<{ index: number; key: string }>;
+
+  constructor(setIndex: number, keys: string[]) {
     this.setIndex = setIndex;
     this.signers = keys.map((key, index) => ({ index, key }));
   }
 
-  getPublicKeys() {
+  getPublicKeys(): Buffer[] {
     return this.signers.map((guardian) => ethPrivateToPublic(guardian.key));
   }
 
-  updateGuardianSetIndex(setIndex) {
+  updateGuardianSetIndex(setIndex: number) {
     this.setIndex = setIndex;
   }
 
-  addSignatures(message, guardianIndices) {
+  addSignatures(message: Buffer, guardianIndices: number[]) {
     if (guardianIndices.length === 0) {
       throw new Error('guardianIndices.length == 0');
     }
@@ -85,19 +88,29 @@ export class MockGuardians {
 }
 
 export class MockEmitter {
-  constructor(emitterAddress, chain, startSequence) {
+  private readonly chain: number;
+  private readonly address: Buffer;
+  private sequence: bigint;
+
+  constructor(emitterAddress: string, chain: number, startSequence?: number | bigint) {
     this.chain = chain;
     const address = Buffer.from(emitterAddress, 'hex');
     if (address.length !== 32) {
       throw new Error('emitterAddress.length != 32');
     }
     this.address = address;
-    this.sequence = startSequence === undefined ? 0 : startSequence;
+    this.sequence = startSequence === undefined ? 0n : BigInt(startSequence);
   }
 
-  publishMessage(nonce, payload, consistencyLevel, timestamp, uptickSequence = true) {
+  publishMessage(
+    nonce: number,
+    payload: Buffer,
+    consistencyLevel: number,
+    timestamp?: number,
+    uptickSequence = true,
+  ) {
     if (uptickSequence) {
-      ++this.sequence;
+      this.sequence += 1n;
     }
 
     const message = Buffer.alloc(51 + payload.length);
@@ -105,7 +118,7 @@ export class MockEmitter {
     message.writeUInt32BE(nonce, 4);
     message.writeUInt16BE(this.chain, 8);
     message.write(this.address.toString('hex'), 10, 'hex');
-    message.writeBigUInt64BE(BigInt(this.sequence), 42);
+    message.writeBigUInt64BE(this.sequence, 42);
     message.writeUInt8(consistencyLevel, 50);
     message.write(payload.toString('hex'), 51, 'hex');
     return message;
@@ -113,7 +126,7 @@ export class MockEmitter {
 }
 
 export class MockEthereumEmitter extends MockEmitter {
-  constructor(emitterAddress, chain) {
-    super(emitterAddress, chain === undefined ? 2 : chain);
+  constructor(emitterAddress: string, chain = 2) {
+    super(emitterAddress, chain);
   }
 }
