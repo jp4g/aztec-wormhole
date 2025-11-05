@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "contracts/emitter",
+    "contracts/bridge",
     "contracts/wormhole"
 ]

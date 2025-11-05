@@ -9,21 +9,21 @@ import { EthAddress } from '@aztec/aztec.js/addresses';
 import { Fr, Point } from '@aztec/aztec.js/fields';
 import { type PublicKey, PublicKeys } from '@aztec/aztec.js/keys';
 import type { Wallet } from '@aztec/aztec.js/wallet';
-import WormholeEmitterContractArtifactJson from './Emitter.json' with { type: 'json' };
-export const WormholeEmitterContractArtifact = loadContractArtifact(WormholeEmitterContractArtifactJson as NoirCompiledContract);
+import WormholeBridgeContractArtifactJson from './WormholeBridge.json' with { type: 'json' };
+export const WormholeBridgeContractArtifact = loadContractArtifact(WormholeBridgeContractArtifactJson as NoirCompiledContract);
 
 
 
 /**
- * Type-safe interface for contract WormholeEmitter;
+ * Type-safe interface for contract WormholeBridge;
  */
-export class WormholeEmitterContract extends ContractBase {
+export class WormholeBridgeContract extends ContractBase {
   
   private constructor(
     instance: ContractInstanceWithAddress,
     wallet: Wallet,
   ) {
-    super(instance, WormholeEmitterContractArtifact, wallet);
+    super(instance, WormholeBridgeContractArtifact, wallet);
   }
   
 
@@ -38,36 +38,36 @@ export class WormholeEmitterContract extends ContractBase {
     address: AztecAddress,
     wallet: Wallet,
   ) {
-    return Contract.at(address, WormholeEmitterContract.artifact, wallet) as Promise<WormholeEmitterContract>;
+    return Contract.at(address, WormholeBridgeContract.artifact, wallet) as Promise<WormholeBridgeContract>;
   }
 
   
   /**
    * Creates a tx to deploy a new instance of this contract.
    */
-  public static deploy(wallet: Wallet, bridge_address: AztecAddressLike, token_address: AztecAddressLike, wormhole_address: AztecAddressLike) {
-    return new DeployMethod<WormholeEmitterContract>(PublicKeys.default(), wallet, WormholeEmitterContractArtifact, WormholeEmitterContract.at, Array.from(arguments).slice(1));
+  public static deploy(wallet: Wallet, token_address: AztecAddressLike, wormhole_address: AztecAddressLike, chain_id: (bigint | number), fee: (bigint | number)) {
+    return new DeployMethod<WormholeBridgeContract>(PublicKeys.default(), wallet, WormholeBridgeContractArtifact, WormholeBridgeContract.at, Array.from(arguments).slice(1));
   }
 
   /**
    * Creates a tx to deploy a new instance of this contract using the specified public keys hash to derive the address.
    */
-  public static deployWithPublicKeys(publicKeys: PublicKeys, wallet: Wallet, bridge_address: AztecAddressLike, token_address: AztecAddressLike, wormhole_address: AztecAddressLike) {
-    return new DeployMethod<WormholeEmitterContract>(publicKeys, wallet, WormholeEmitterContractArtifact, WormholeEmitterContract.at, Array.from(arguments).slice(2));
+  public static deployWithPublicKeys(publicKeys: PublicKeys, wallet: Wallet, token_address: AztecAddressLike, wormhole_address: AztecAddressLike, chain_id: (bigint | number), fee: (bigint | number)) {
+    return new DeployMethod<WormholeBridgeContract>(publicKeys, wallet, WormholeBridgeContractArtifact, WormholeBridgeContract.at, Array.from(arguments).slice(2));
   }
 
   /**
    * Creates a tx to deploy a new instance of this contract using the specified constructor method.
    */
-  public static deployWithOpts<M extends keyof WormholeEmitterContract['methods']>(
+  public static deployWithOpts<M extends keyof WormholeBridgeContract['methods']>(
     opts: { publicKeys?: PublicKeys; method?: M; wallet: Wallet },
-    ...args: Parameters<WormholeEmitterContract['methods'][M]>
+    ...args: Parameters<WormholeBridgeContract['methods'][M]>
   ) {
-    return new DeployMethod<WormholeEmitterContract>(
+    return new DeployMethod<WormholeBridgeContract>(
       opts.publicKeys ?? PublicKeys.default(),
       opts.wallet,
-      WormholeEmitterContractArtifact,
-      WormholeEmitterContract.at,
+      WormholeBridgeContractArtifact,
+      WormholeBridgeContract.at,
       Array.from(arguments).slice(1),
       opts.method ?? 'constructor',
     );
@@ -79,34 +79,43 @@ export class WormholeEmitterContract extends ContractBase {
    * Returns this contract's artifact.
    */
   public static get artifact(): ContractArtifact {
-    return WormholeEmitterContractArtifact;
+    return WormholeBridgeContractArtifact;
   }
 
   /**
    * Returns this contract's artifact with public bytecode.
    */
   public static get artifactForPublic(): ContractArtifact {
-    return loadContractArtifactForPublic(WormholeEmitterContractArtifactJson as NoirCompiledContract);
+    return loadContractArtifactForPublic(WormholeBridgeContractArtifactJson as NoirCompiledContract);
   }
   
 
-  public static get storage(): ContractStorageLayout<'config'> {
+  public static get storage(): ContractStorageLayout<'config' | 'fee'> {
       return {
         config: {
       slot: new Fr(1n),
+    },
+fee: {
+      slot: new Fr(5n),
     }
-      } as ContractStorageLayout<'config'>;
+      } as ContractStorageLayout<'config' | 'fee'>;
     }
     
 
   /** Type-safe wrappers for the public methods exposed by the contract. */
   public declare methods: {
     
-    /** bridge(msg: array, amount: integer, nonce: field) */
-    bridge: ((msg: (bigint | number)[][], amount: (bigint | number), nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** bridge_out_private(recipient_address: array, amount: integer, bridge_nonce: field, fee_nonce: field) */
+    bridge_out_private: ((recipient_address: (bigint | number)[], amount: (bigint | number), bridge_nonce: FieldLike, fee_nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** constructor(bridge_address: struct, token_address: struct, wormhole_address: struct) */
-    constructor: ((bridge_address: AztecAddressLike, token_address: AztecAddressLike, wormhole_address: AztecAddressLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+    /** constructor(token_address: struct, wormhole_address: struct, chain_id: integer, fee: integer) */
+    constructor: ((token_address: AztecAddressLike, wormhole_address: AztecAddressLike, chain_id: (bigint | number), fee: (bigint | number)) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
+    /** get_config() */
+    get_config: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
+
+    /** get_wormhole_message_fee() */
+    get_wormhole_message_fee: (() => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
     /** process_message(message_ciphertext: struct, message_context: struct) */
     process_message: ((message_ciphertext: FieldLike[], message_context: { tx_hash: FieldLike, unique_note_hashes_in_tx: FieldLike[], first_nullifier_in_tx: FieldLike, recipient: AztecAddressLike }) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;

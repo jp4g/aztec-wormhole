@@ -4,10 +4,8 @@ export const TOKEN_METADATA = {
     decimals: 6
 };
 
-export const WORMHOLE_CHAIN_IDS = {
-    anvil: 31337,
-    sepolia: 10003,
-}
+export const WORMHOLE_CHAIN_IDS = { wormhole: 57, evm: 57 }
+
 
 export const WORMHOLE_MESSAGE_SLOT_LENGTH = 31;
 export const WORMHOLE_DEFAULT_TOTAL_SLOTS = 7;

@@ -40,12 +40,12 @@ async function main() {
             join(artifactsDir, "wormhole", "Wormhole.json")
         );
         await copyFileWithLog(
-            "./target/WormholeEmitter.ts",
-            join(artifactsDir, "emitter", "Emitter.ts")
+            "./target/WormholeBridge.ts",
+            join(artifactsDir, "bridge", "WormholeBridge.ts")
         )
         await copyFileWithLog(
-            "./target/emitter-WormholeEmitter.json",
-            join(artifactsDir, "emitter", "Emitter.json")
+            "./target/wormhole_bridge-WormholeBridge.json",
+            join(artifactsDir, "bridge", "WormholeBridge.json")
         );
 
         // Update import paths
@@ -56,9 +56,9 @@ async function main() {
             "./Wormhole.json"
         );
         await replaceInFile(
-            join(artifactsDir, "emitter", "Emitter.ts"),
-            "./emitter-WormholeEmitter.json",
-            "./Emitter.json"
+            join(artifactsDir, "bridge", "WormholeBridge.ts"),
+            "./wormhole_bridge-WormholeBridge.json",
+            "./WormholeBridge.json"
         );
 
         console.log("Compiled artifacts and packed artifacts for export successfully!");
