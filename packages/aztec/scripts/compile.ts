@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { dirname, join } from "path";
-import { execCommand, copyFileWithLog, replaceInFile } from "./utils";
+import { execCommand, copyFileWithLog, replaceInFile } from "./utils/cmd";
 
 async function main() {
     try {
@@ -11,9 +11,17 @@ async function main() {
         console.log(`Working in contracts directory: ${contractsDir}...`);
         process.chdir(contractsDir);
 
+        // remove old artifacts
+        await execCommand("rm", ["-rf", "target"]);
+
         // compiling Wormhole Brige and Emitter Contracts
         console.log("Starting compilation...");
-        await execCommand("aztec-nargo", ["compile"]);
+        await execCommand(
+            "aztec-nargo",
+            ["compile"],
+            undefined,
+            { VERSION: "3.0.0-devnet.3" }
+        );
         console.log("Compilation completed, postprocessing artifacts...");
         await execCommand("aztec-postprocess-contract");
 

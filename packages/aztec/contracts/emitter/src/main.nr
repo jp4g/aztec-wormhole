@@ -6,7 +6,7 @@ pub mod config;
 pub contract WormholeEmitter {
     use aztec::{
         macros::{
-            functions::{private, initializer, public},
+            functions::{initializer, external},
             storage::storage
         }, 
         protocol_types::{
@@ -25,7 +25,7 @@ pub contract WormholeEmitter {
     }
 
     #[initializer]
-    #[public]
+    #[external("public")]
     fn constructor(
             bridge_address: AztecAddress,
             token_address: AztecAddress,
@@ -38,7 +38,7 @@ pub contract WormholeEmitter {
         ));
     }
 
-    #[private]
+    #[external("private")]
     fn bridge(
         msg: [[u8;31];7], // Format: [zkDonation Arb Address, Arb chain ID, msg1, msg2, msg3, msg4, msg5]
         amount: u128, // amount of tokens to be donated on chosen chainID
@@ -49,7 +49,7 @@ pub contract WormholeEmitter {
 
         // 2. Perform zk Donation
         let _ = Token::at(config.token_address).transfer_in_private(
-            context.msg_sender(),
+            context.msg_sender().unwrap(),
             config.bridge_address, // should be set to the bridge address but for demo purposes the user can supply it
             amount,
             nonce
@@ -72,7 +72,7 @@ pub contract WormholeEmitter {
             wormhole_payload, // payloads: [[u8; 31]; 8]
             2, // message_fee: u128
             2, // consistency: u8
-            context.msg_sender(), // from: AztecAddress
+            context.msg_sender().unwrap(), // from: AztecAddress
             nonce, // token_nonce: Field
         ).call(&mut context);
     }

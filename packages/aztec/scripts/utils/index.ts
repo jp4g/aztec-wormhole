@@ -1,36 +1,69 @@
-import { spawn } from "bun";
-import { copyFile, readFile, writeFile } from "fs/promises";
+import { TestWallet } from "@aztec/test-wallet/server";
+import { AztecAddress } from "@aztec/aztec.js/addresses";
+import { getInitialTestAccountsData } from "@aztec/accounts/testing";
+import accounts from "../data/accounts.json";
+import addresses from "../data/addresses.json";
+import { Fr } from "@aztec/foundation/fields";
+import { AztecNode } from "@aztec/aztec.js/node";
+import type { PXEConfig } from "@aztec/pxe/config"
+import { isTestnet } from "../../ts/src/utils";
 
-export async function execCommand(command: string, args: string[] = [], cwd?: string): Promise<void> {
-  const proc = spawn({
-    cmd: [command, ...args],
-    cwd,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
 
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`Command failed: ${command} ${args.join(' ')} (exit code: ${exitCode})`);
-  }
+type AccountData = {
+  secretKey: string;
+  salt: string;
 }
 
-export async function copyFileWithLog(src: string, dest: string): Promise<void> {
-  try {
-    await copyFile(src, dest);
-    console.log(`Copied: ${src} → ${dest}`);
-  } catch (error) {
-    throw new Error(`Failed to copy ${src} to ${dest}: ${error}`);
-  }
+export type ContractAddressData = {
+  receiver: string;
+  wormhole: string;
+  token: string;
+  emitter?: string;
 }
 
-export async function replaceInFile(filePath: string, searchText: string, replaceText: string): Promise<void> {
-  try {
-    const content = await readFile(filePath, "utf-8");
-    const updatedContent = content.replace(new RegExp(searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), replaceText);
-    await writeFile(filePath, updatedContent, "utf-8");
-    console.log(`Updated imports in: ${filePath}`);
-  } catch (error) {
-    throw new Error(`Failed to update file ${filePath}: ${error}`);
+export const getAccounts = async (
+  node: AztecNode,
+  pxeConfig: Partial<PXEConfig> = {}
+): Promise<{
+  wallet: TestWallet,
+  addresses: AztecAddress[]
+}> => {
+  // check if testnet
+  let wallet = await TestWallet.create(node, pxeConfig);
+  let addresses = [];
+  if (await isTestnet(node)) {
+    // if testnet, get accounts from env (should run setup_accounts.ts first)
+    addresses = await getAccountsFromFs(wallet);
+  } else {
+    // if sandbox, get initialized test accounts
+    const accounts = await getInitialTestAccountsData();
+    for (const account of accounts) {
+      await wallet.createSchnorrAccount(account.secret, account.salt);
+      addresses.push(account.address);
+      await wallet.registerSender(account.address);
+    }
   }
+
+  return { wallet, addresses };
+}
+
+export const getAddressesFromFs = async (): Promise<
+  { [chainId: string]: ContractAddressData }
+> => {
+  // read addresses from file
+  return addresses as { [chainId: string]: ContractAddressData };
+}
+
+export const getAccountsFromFs = async (
+  wallet: TestWallet
+): Promise<AztecAddress[]> => {
+  // reinstantiate the accounts
+  const addresses = [];
+  for (const account of accounts as AccountData[]) {
+    const secretKey = Fr.fromString(account.secretKey);
+    const salt = Fr.fromString(account.salt);
+    const manager = await wallet.createSchnorrAccount(secretKey, salt);
+    addresses.push(manager.address);
+  }
+  return addresses;
 }

@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@aztec/accounts": "2.0.3",
+    "@aztec/aztec": "2.0.3",
     "@aztec/aztec.js": "2.0.3",
     "@aztec/noir-contracts.js": "2.0.3",
     "@wormhole-foundation/sdk": "3.9.0",

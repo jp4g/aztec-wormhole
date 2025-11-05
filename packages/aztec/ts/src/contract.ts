@@ -1,16 +1,23 @@
-import { AccountWallet, AuthWitness, AztecAddress, Fr, SendMethodOptions, WaitOpts } from "@aztec/aztec.js";
-import { WormholeContract, WormholeEmitterContract } from "./artifacts";
+// import { AccountWallet, AuthWitness, Fr, SendMethodOptions, WaitOpts } from "@aztec/aztec.js";
+import { AztecAddress } from "@aztec/aztec.js/addresses";
+import { WormholeContract, WormholeContractArtifact, WormholeEmitterContract, WormholeEmitterContractArtifact } from "./artifacts";
 import { TOKEN_METADATA } from "./constants";
-import { TokenContract } from "@aztec/noir-contracts.js/Token";
+import { TokenContract, TokenContractArtifact } from "@aztec/noir-contracts.js/Token";
+import { BaseWallet } from "@aztec/aztec.js/wallet";
+import { SendInteractionOptions, WaitOpts } from "@aztec/aztec.js/contracts";
+import { AuthWitness } from "@aztec/stdlib/auth-witness";
+import { Fr } from "@aztec/aztec.js/fields";
+import { AztecNode } from "@aztec/aztec.js/node";
 
 export async function deployTokenContract(
-    wallet: AccountWallet,
-    tokenMetadata: {name: string, symbol: string, decimals: number} = TOKEN_METADATA,
-    opts: { send: SendMethodOptions, wait?: WaitOpts } = { send: { from: wallet.getAddress() } }
+    wallet: BaseWallet,
+    from: AztecAddress,
+    tokenMetadata: { name: string, symbol: string, decimals: number } = TOKEN_METADATA,
+    opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
 ): Promise<TokenContract> {
     return await TokenContract.deploy(
         wallet,
-        wallet.getAddress(),
+        from,
         tokenMetadata.name,
         tokenMetadata.symbol,
         tokenMetadata.decimals,
@@ -20,19 +27,18 @@ export async function deployTokenContract(
 }
 
 export async function deployWormholeContract(
-    wallet: AccountWallet,
-    chainIds: {wormhole: number, evm: number},
+    wallet: BaseWallet,
+    from: AztecAddress,
+    chainIds: { wormhole: number, evm: number },
     tokenAddress: AztecAddress,
-    receiverAddress: AztecAddress = wallet.getAddress(),
-    opts: { send: SendMethodOptions, wait?: WaitOpts } = { send: { from: wallet.getAddress() } }
+    receiverAddress: AztecAddress = from,
+    opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
 ): Promise<WormholeContract> {
-    console.log("A", tokenAddress);
-    console.log("B", receiverAddress);
     return await WormholeContract.deploy(
         wallet,
         chainIds.wormhole,
         chainIds.evm,
-        wallet.getAddress(), // contract owner address
+        from, // contract owner address
         receiverAddress,
         tokenAddress
     )
@@ -41,11 +47,12 @@ export async function deployWormholeContract(
 }
 
 export async function deployWormholeEmitterContract(
-    wallet: AccountWallet,
+    wallet: BaseWallet,
+    from: AztecAddress,
     tokenAddress: AztecAddress,
     wormholeAddress: AztecAddress,
-    bridgeAddress: AztecAddress = wallet.getAddress(), // todo: fix to be an actual escrow
-    opts: { send: SendMethodOptions, wait?: WaitOpts } = { send: { from: wallet.getAddress() } }
+    bridgeAddress: AztecAddress = from, // todo: fix to be an actual escrow
+    opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
 ): Promise<WormholeEmitterContract> {
     return await WormholeEmitterContract.deploy(
         wallet,
@@ -59,19 +66,62 @@ export async function deployWormholeEmitterContract(
 
 export async function privateTransferAuthwit(
     token: TokenContract,
-    from: AccountWallet,
+    wallet: BaseWallet,
+    from: AztecAddress,
     to: AztecAddress,
     caller: AztecAddress,
     amount: bigint,
     nonce?: Fr
 ): Promise<{ nonce: Fr, authwit: AuthWitness }> {
     if (!nonce) nonce = Fr.random();
-    const action = token.methods.transfer_in_private(
-        from.getAddress(),
+    const call = await token.methods.transfer_in_private(
+        from,
         to,
         amount,
         nonce
-    );
-    const authwit = await from.createAuthWit({ action, caller });
+    ).getFunctionCall();
+    const authwit = await wallet.createAuthWit(from, { call, caller });
     return { nonce, authwit };
+}
+
+export async function getTokenContract(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    node: AztecNode,
+    address: AztecAddress
+): Promise<TokenContract> {
+    const instance = await node.getContract(address);
+    if (!instance) throw new Error(`Token contract instance at ${address.toString()} not found`);
+    await wallet.registerContract({ instance, artifact: TokenContractArtifact });
+    const token = await TokenContract.at(address, wallet);
+    await token.methods.sync_private_state().simulate({ from });
+    return token;
+}
+
+export async function getWormholeContract(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    node: AztecNode,
+    address: AztecAddress
+): Promise<WormholeContract> {
+    const instance = await node.getContract(address);
+    if (!instance) throw new Error(`Wormhole contract instance at ${address.toString()} not found`);
+    await wallet.registerContract({ instance, artifact: WormholeContractArtifact });
+    const wormhole = await WormholeContract.at(address, wallet);
+    await wormhole.methods.sync_private_state().simulate({ from });
+    return wormhole;
+}
+
+export async function getWormholeEmitterContract(
+    wallet: BaseWallet,
+    from: AztecAddress,
+    node: AztecNode,
+    address: AztecAddress
+): Promise<WormholeEmitterContract> {
+    const instance = await node.getContract(address);
+    if (!instance) throw new Error(`Wormhole emitter contract instance at ${address.toString()} not found`);
+    await wallet.registerContract({ instance, artifact: WormholeEmitterContractArtifact });
+    const wormholeEmitter = await WormholeEmitterContract.at(address, wallet);
+    await wormholeEmitter.methods.sync_private_state().simulate({ from });
+    return wormholeEmitter;
 }

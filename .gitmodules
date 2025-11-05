@@ -4,6 +4,7 @@
 [submodule "packages/evm/lib/wormhole"]
 	path = packages/evm/lib/wormhole
 	url = https://github.com/NethermindEth/wormhole
+	branch = v3.0.0
 [submodule "packages/aztec/deps/wormhole"]
 	path = packages/aztec/deps/wormhole
 	url = https://github.com/NethermindEth/wormhole
