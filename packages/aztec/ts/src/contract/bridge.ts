@@ -9,6 +9,7 @@ import { BridgeConfig } from "../types";
 import { hexAddressToUint8Array } from "../wormhole";
 
 export async function bridgeOutPrivate(
+    flat: boolean, // ISSUE REPRODUCTION FLAG - TO BE REMOVED
     wallet: BaseWallet,
     from: AztecAddress,
     bridge: WormholeBridgeContract,
@@ -57,9 +58,10 @@ export async function bridgeOutPrivate(
     const recipientAddress = Array.from(hexAddressToUint8Array(receiverAddress.toString()));
 
     // attempt to bridge out
-    console.log("recipientAddress", recipientAddress);
+    // ISSUE REPRODUCTION STEP - REPLACE WITH `methods.bridge_out_private` ALWAYS
+    const method = flat ? "bridge_out_private_flat" : "bridge_out_private"
     return await bridge
-        .methods.bridge_out_private(
+        .methods[method](
             recipientAddress,
             bridgeAmount,
             bridgeNonce,

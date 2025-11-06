@@ -108,12 +108,32 @@ describe("EVM Wormhole Crosschain Test", () => {
         ).send({ from: admin }).wait();
     });
 
-    test("e2e", async () => {
+    test("with flat map", async () => {
         const bridgeAmount = wad(1n, 6n);
         const receiverAddress = EthAddress.fromString("0x1234567890abcdef1234567890abcdef12345678");
 
         // execute bridge transaction
         const receipt = await bridgeOutPrivate(
+            true, // use flat
+            wallet,
+            alice,
+            bridge,
+            token,
+            bridgeAmount,
+            receiverAddress
+        );
+
+        expect(receipt).toBeDefined();
+        console.log("Initialized message on l2");
+    });
+
+    test("without flat map", async () => {
+        const bridgeAmount = wad(1n, 6n);
+        const receiverAddress = EthAddress.fromString("0x1234567890abcdef1234567890abcdef12345678");
+
+        // execute bridge transaction
+        const receipt = await bridgeOutPrivate(
+            false, // dont use flat
             wallet,
             alice,
             bridge,
