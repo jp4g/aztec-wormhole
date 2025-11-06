@@ -1,24 +1,3 @@
-x-pxe-base: &pxe-base
-  image: aztecprotocol/aztec:latest
-  ports:
-    - "8081-8082:8080"
-  entrypoint: ["/bin/bash", "-c"]
-  command:
-    - |
-      node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --pxe
-  environment:
-    - AZTEC_PORT=8080
-    - LOG_LEVEL=info
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:8080/status"]
-    interval: 10s
-    timeout: 5s
-    retries: 10
-    start_period: 30s
-  restart: unless-stopped
-  networks:
-    - aztec-network
-
 services:
   anvil:
     container_name: anvil-ethereum-node
@@ -49,7 +28,7 @@ services:
       - ETHEREUM_HOSTS=http://anvil:8545
       - AZTEC_PORT=8080
       - P2P_PORT=40400
-      - NO_PXE=true
+      - SEQ_MIN_TX_PER_BLOCK=1
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -65,31 +44,116 @@ services:
     restart: unless-stopped
     networks:
       - aztec-network
-  aztec-sandbox-pxe:
-    <<: *pxe-base
+
+  # Mock Spy for Local Development (Sandbox)
+  mock-spy:
+    container_name: wormhole-mock-spy
     profiles:
-      - sandbox
+      - relayer
+    build:
+      context: ./packages/mock-spy
+      dockerfile: Dockerfile
+    ports:
+      - "7073:7073"  # gRPC for relayer
+      - "8081:8081"  # HTTP for Next.js/test scripts
     environment:
-      - AZTEC_NODE_URL=http://aztec-sandbox-node:8080
-      - ETHEREUM_HOSTS=http://anvil:8545
-      - PXE_PROVER_ENABLED=false
+      - LOG_LEVEL=info
+      - GRPC_PORT=7073
+      - HTTP_PORT=8081
+    restart: unless-stopped
+    networks:
+      - aztec-network
+
+  relayer:
+    container_name: aztec-wormhole-relayer
+    profiles:
+      - relayer
+    build:
+      context: ./packages/relayer
+      dockerfile: Dockerfile
+    environment:
+      - LOG_LEVEL=info
+      - SPY_RPC_HOST=mock-spy:7073
+      - ARBITRUM_RPC_URL=http://anvil:8545
+      - DEST_CHAIN_ID=31337
+      - SOURCE_CHAIN_ID=56
+      - AZTEC_PXE_URL=http://aztec-sandbox-node:8080
     depends_on:
-      aztec-sandbox-node:
-        condition: service_healthy
-    deploy:
-      replicas: 2
-  aztec-testnet-pxe:
-    <<: *pxe-base
+      - mock-spy
+      - anvil
+      - aztec-sandbox-node
+    restart: unless-stopped
+    networks:
+      - aztec-network
+
+  frontend:
+    container_name: aztec-wormhole-frontend
     profiles:
-      - testnet
+      - frontend
+    build:
+      context: ./packages/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
     environment:
-      - AZTEC_NODE_URL=https://aztec-alpha-testnet-fullnode.zkv.xyz
-      - ETHEREUM_HOSTS=https://eth-sepolia.public.blastapi.io
-      - L1_CHAIN_ID=11155111
-      - ROLLUP_VERSION=1714840162
-      - PXE_PROVER_ENABLED=true
-    deploy:
-      replicas: 2
+      - NEXT_PUBLIC_RPC_URL=http://anvil:8545
+      - NEXT_PUBLIC_PXE_URL=http://aztec-sandbox-node:8080
+      - NEXT_PUBLIC_CONTRACT_ADDRESS=0x009cbB8f91d392856Cb880d67c806Aa731E3d686
+      - MOCK_SPY_URL=http://mock-spy:8081
+      - PXE_URL=http://aztec-sandbox-node:8080
+    depends_on:
+      - anvil
+      - aztec-sandbox-node
+      - mock-spy
+    restart: unless-stopped
+    networks:
+      - aztec-network
+
+  # Real Wormhole Spy + Relayer for Testnet
+  # Uncomment these services when you're ready to use testnet
+
+  # wormhole-spy:
+  #   container_name: wormhole-spy
+  #   profiles:
+  #     - testnet
+  #   image: ghcr.io/wormhole-foundation/guardiand:latest
+  #   platform: linux/amd64
+  #   pull_policy: always
+  #   ports:
+  #     - "7073:7073"
+  #   entrypoint: ["/guardiand"]
+  #   command:
+  #     - spy
+  #     - --nodeKey
+  #     - /node.key
+  #     - --spyRPC
+  #     - "[::]:7073"
+  #     - --env
+  #     - testnet
+  #   restart: unless-stopped
+  #   networks:
+  #     - aztec-network
+
+  # relayer:
+  #   container_name: aztec-wormhole-relayer
+  #   profiles:
+  #     - testnet
+  #   build:
+  #     context: ./packages/relayer
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     - LOG_LEVEL=info
+  #     - SPY_RPC_HOST=wormhole-spy:7073
+  #     - ARBITRUM_RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
+  #     - ARBITRUM_TARGET_CONTRACT=<your_contract_address>
+  #     - DEST_CHAIN_ID=421614  # Arbitrum Sepolia
+  #     - PRIVATE_KEY=<your_private_key>
+  #   depends_on:
+  #     - wormhole-spy
+  #   restart: unless-stopped
+  #   networks:
+  #     - aztec-network
+
 
 networks:
   aztec-network:

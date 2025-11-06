@@ -1,24 +1,14 @@
 {
-  "name": "aztec-wormhole-zkpassport",
+  "name": "aztec-wormhole",
   "version": "1.0.0",
-  "description": "Monorepo for Aztec/Wormhole demo with frontend, Foundry, Go relayer, and Noir",
-  "private": true,
-  "main": "index.js",
+  "description": "Monorepo for Aztec Wormhole to EVM and Solana",
   "scripts": {
-    "dev": "turbo run dev --parallel",
-    "build": "turbo run build",
-    "test": "turbo run test",
-    "lint": "turbo run lint",
-    "clean": "turbo run clean",
     "sandbox": "docker compose --profile sandbox up",
     "testnet": "docker compose --profile testnet up"
   },
   "workspaces": [
-    "packages/*",
-    "packages/*/*"
+    "packages/aztec-contracts",
+    "packages/frontend"
   ],
-  "devDependencies": {
-    "turbo": "^2"
-  },
-  "packageManager": "npm@10.9.0"
+  "packageManager": "bun@1.3.1"
 }
