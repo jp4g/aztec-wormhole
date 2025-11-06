@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "description": "Monorepo for Aztec Wormhole to EVM and Solana",
   "scripts": {
-    "sandbox": "docker compose --profile sandbox up",
-    "testnet": "docker compose --profile testnet up"
+    "sandbox": "docker compose up",
   },
   "workspaces": [
     "packages/aztec-contracts",

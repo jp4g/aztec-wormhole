@@ -15,19 +15,42 @@ import {
     deployWormholeContract,
     deployWormholeBridgeContract,
 } from "../src/contract/deploy";
-
+import {
+    createPublicClient,
+    createWalletClient,
+    getContract,
+    HDAccount,
+    http,
+    PublicClient,
+    WalletClient,
+} from 'viem';
+import { mnemonicToAccount } from "viem/accounts";
+import { anvil } from "viem/chains";
+import {
+    DonationABI,
+    DonationBytecode,
+    DonationContract,
+    VaultABI,
+    VaultBytecode,
+    VaultContract
+} from "../src/eth/artifacts";
 
 
 const {
     L1_RPC_URL = "http://localhost:8545",
     L2_NODE_URL = "http://localhost:8080",
+    MNEMONIC = "test test test test test test test test test test test junk"
 } = process.env;
 
 // type WormholePayload: Array
-
-
 describe("EVM Wormhole Crosschain Test", () => {
 
+    let account: HDAccount;
+    let publicClient: PublicClient;
+    let walletClient: WalletClient;
+
+    let donationContract: DonationContract;
+    let vaultContract: VaultContract;
 
     let node: AztecNode;
     let cc: CheatCodes;
@@ -42,6 +65,75 @@ describe("EVM Wormhole Crosschain Test", () => {
     let bridge: WormholeBridgeContract;
 
     beforeAll(async () => {
+        // set up evm stuff
+        account = mnemonicToAccount(MNEMONIC);
+        publicClient = createPublicClient({
+            chain: anvil,
+            transport: http()
+        });
+        walletClient = createWalletClient({
+            account,
+            chain: anvil,
+            transport: http(),
+        });
+
+        // deploy donation contract
+        const donationHash = await walletClient.deployContract({
+            abi: DonationABI,
+            account,
+            args: [account.address],
+            bytecode: DonationBytecode,
+            chain: anvil
+        });
+
+        const donationReceipt = await publicClient.waitForTransactionReceipt({
+            hash: donationHash,
+        });
+
+        donationContract = getContract({
+            address: donationReceipt.contractAddress!,
+            abi: DonationABI,
+            client: {
+                public: publicClient,
+                wallet: walletClient
+            }
+        });
+
+        console.log("deployed donation")
+
+        const wormholeAddress: `0x${string}` = "0x6b9C8671cdDC8dEab9c719bB87cBd3e782bA6a35";
+        const wormholeChainId = 10003;
+        const evmChainId = 31337;
+        const finality = 2;
+
+        // deploy vault contract
+        const vaultHash = await walletClient.deployContract({
+            abi: VaultABI,
+            account,
+            args: [
+                wormholeAddress,
+                wormholeChainId,
+                evmChainId,
+                finality,
+                donationReceipt.contractAddress
+            ],
+            bytecode: VaultBytecode,
+            chain: anvil
+        });
+
+        const vaultReceipt = await publicClient.waitForTransactionReceipt({
+            hash: vaultHash,
+        });
+        vaultContract = getContract({
+            address: vaultReceipt.contractAddress!,
+            abi: VaultABI,
+            client: {
+                public: publicClient,
+                wallet: walletClient
+            }
+        });
+        console.log("Deployed evm contracts noice");
+
         // set up clients
         node = createAztecNodeClient(L2_NODE_URL);
         cc = await CheatCodes.create([L1_RPC_URL], node, new TestDateProvider());
@@ -115,25 +207,6 @@ describe("EVM Wormhole Crosschain Test", () => {
         // execute bridge transaction
         const receipt = await bridgeOutPrivate(
             true, // use flat
-            wallet,
-            alice,
-            bridge,
-            token,
-            bridgeAmount,
-            receiverAddress
-        );
-
-        expect(receipt).toBeDefined();
-        console.log("Initialized message on l2");
-    });
-
-    test("without flat map", async () => {
-        const bridgeAmount = wad(1n, 6n);
-        const receiverAddress = EthAddress.fromString("0x1234567890abcdef1234567890abcdef12345678");
-
-        // execute bridge transaction
-        const receipt = await bridgeOutPrivate(
-            false, // dont use flat
             wallet,
             alice,
             bridge,

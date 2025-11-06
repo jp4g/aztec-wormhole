@@ -24,6 +24,7 @@
     "noPropertyAccessFromIndexSignature": false
   },
   "exclude": [
+    "src/eth/artifacts",
     "node_modules",
     "contracts",
     "deps",
