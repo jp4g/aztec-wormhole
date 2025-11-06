@@ -1,4 +1,7 @@
 {
+  "../aztec/deps/wormhole": {
+    "rev": "24781a027b23fd7bd3a20cf45958d14b27b68272"
+  },
   "lib/openzeppelin-contracts": {
     "rev": "c64a1edb67b6e3f4a15cca8909c9482ad33a02b0"
   },
