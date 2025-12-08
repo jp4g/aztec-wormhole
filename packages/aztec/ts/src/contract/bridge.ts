@@ -7,6 +7,7 @@ import { WormholeBridgeContract } from "../artifacts";
 import { privateTransferAuthwit } from "./token";
 import { BridgeConfig } from "../types";
 import { hexAddressToUint8Array } from "../wormhole";
+import { SendInteractionOptions, WaitOpts } from "@aztec/aztec.js/contracts";
 
 export async function bridgeOutPrivate(
     flat: boolean, // ISSUE REPRODUCTION FLAG - TO BE REMOVED
@@ -15,23 +16,31 @@ export async function bridgeOutPrivate(
     bridge: WormholeBridgeContract,
     token: TokenContract,
     bridgeAmount: bigint,
-    receiverAddress: EthAddress, // todo: support solana keys
+    receiverAddress: string,
     wormholeAddress?: AztecAddress,
+    opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
 ): Promise<TxReceipt> {
     bridge = bridge.withWallet(wallet);
     // create bridge transfer authwit
     console.log("tryna make authwit")
     const authWitnesses = [];
+    let bridgeNonce = Fr.ZERO;
     let feeNonce = Fr.ZERO;
-    const { nonce: bridgeNonce, authwit: bridgeAuthwit } = await privateTransferAuthwit(
-        token,
-        wallet,
-        from,
-        "transfer_to_public",
-        bridge.address, // caller/ recipient
-        bridgeAmount
-    );
-    authWitnesses.push(bridgeAuthwit);
+
+    if (bridgeAmount > 0n) {
+        const { nonce, authwit } = await privateTransferAuthwit(
+            token,
+            wallet,
+            from,
+            // "transfer_to_public",
+            "transfer_in_private",
+            bridge.address, // caller/ recipient
+            bridgeAmount
+        );
+        authWitnesses.push(authwit);
+        bridgeNonce = nonce;
+    }
+
 
     // check for message fee
     const fee = await bridge.methods.get_wormhole_message_fee().simulate({ from });
@@ -55,11 +64,12 @@ export async function bridgeOutPrivate(
     }
 
     // bridge inputs
-    const recipientAddress = Array.from(hexAddressToUint8Array(receiverAddress.toString()));
+    const recipientAddress = Array.from(hexAddressToUint8Array(receiverAddress));
 
     // attempt to bridge out
     // ISSUE REPRODUCTION STEP - REPLACE WITH `methods.bridge_out_private` ALWAYS
-    const method = flat ? "bridge_out_private_flat" : "bridge_out_private"
+    // const method = flat ? "bridge_out_private_flat" : "bridge_out_private"
+    const method = "bridge_out_private"
     return await bridge
         .methods[method](
             recipientAddress,
@@ -67,8 +77,8 @@ export async function bridgeOutPrivate(
             bridgeNonce,
             feeNonce
         )
-        .send({ from, authWitnesses })
-        .wait();
+        .send({ authWitnesses, ...opts.send })
+        .wait(opts.wait);
 }
 
 export async function getBridgeConfig(

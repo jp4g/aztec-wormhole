@@ -34,7 +34,7 @@ import {
     VaultBytecode,
     VaultContract
 } from "../src/eth/artifacts";
-
+import { MockGuardians } from "@certusone/wormhole-sdk/lib/cjs/mock";
 
 const {
     L1_RPC_URL = "http://localhost:8545",
@@ -42,6 +42,8 @@ const {
     MNEMONIC = "test test test test test test test test test test test junk"
 } = process.env;
 
+
+const GUARDIAN_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
 // type WormholePayload: Array
 describe("EVM Wormhole Crosschain Test", () => {
 
@@ -67,6 +69,12 @@ describe("EVM Wormhole Crosschain Test", () => {
     beforeAll(async () => {
         // set up evm stuff
         account = mnemonicToAccount(MNEMONIC);
+        const addressBuffer = Buffer.from(account.address.slice(2), 'hex');
+        const pubkeyX = Buffer.from(account.publicKey.slice(2, 66), 'hex');
+        const pubkeyY = Buffer.from(account.publicKey.slice(66, 130), 'hex');
+        console.log("Guardian Address bytes: ", Array.from(addressBuffer));
+        console.log("Guardian pubkey x bytes: ", Array.from(pubkeyX));
+        console.log("Guardian pubkey y bytes: ", Array.from(pubkeyY));
         publicClient = createPublicClient({
             chain: anvil,
             transport: http()
@@ -134,6 +142,9 @@ describe("EVM Wormhole Crosschain Test", () => {
         });
         console.log("Deployed evm contracts noice");
 
+        // set up mock guardian
+        let guardians = new MockGuardians(1, [GUARDIAN_KEY]);
+
         // set up clients
         node = createAztecNodeClient(L2_NODE_URL);
         cc = await CheatCodes.create([L1_RPC_URL], node, new TestDateProvider());
@@ -198,11 +209,12 @@ describe("EVM Wormhole Crosschain Test", () => {
             bob,
             wad(1000n, 6n)
         ).send({ from: admin }).wait();
+
+        // 
     });
 
     test("with flat map", async () => {
         const bridgeAmount = wad(1n, 6n);
-        const receiverAddress = EthAddress.fromString("0x1234567890abcdef1234567890abcdef12345678");
 
         // execute bridge transaction
         const receipt = await bridgeOutPrivate(
@@ -212,7 +224,7 @@ describe("EVM Wormhole Crosschain Test", () => {
             bridge,
             token,
             bridgeAmount,
-            receiverAddress
+            vaultContract.address
         );
 
         expect(receipt).toBeDefined();

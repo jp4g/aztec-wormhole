@@ -14,10 +14,8 @@ import type { PXEConfig } from "@aztec/pxe/config";
 import {
     deployTokenContract,
     deployWormholeContract,
-    deployWormholeEmitterContract,
-    getTokenContract,
-    getWormholeContract
-} from "../ts/src/contract";
+    deployWormholeBridgeContract,
+} from "../ts/src/contract/deploy";
 import { getTestnetSendWaitOptions } from "./utils/gas";
 import { TOKEN_METADATA } from "../ts/src/constants";
 import { AztecAddress } from "@aztec/stdlib/aztec-address";
@@ -81,33 +79,34 @@ async function main() {
         }
     }
 
-    // deploy emitter
-    let emitterAddress;
+    // deploy bridge
+    let bridgeAddress;
     try {
-        const emitterContract = await deployWormholeEmitterContract(
+        const bridgeContract = await deployWormholeBridgeContract(
             wallet,
             addresses[0],
             tokenAddress,
             wormholeAddress,
-            addresses[0],
+            10003n,
+            0n,
             opts
         );
-        emitterAddress = emitterContract.address;
+        bridgeAddress = bridgeContract.address;
     } catch (e) {
         console.error(e);
-        throw new Error("Failed to deploy emitter contract");
+        throw new Error("Failed to deploy bridge contract");
     }
 
     // save to fs
     try {
         const chainId = await node.getNodeInfo().then(info => info.l1ChainId.toString());
         const scriptDir = dirname(import.meta.path);
-        const addressesFilePath = join(scriptDir, "../data/addresses.json", chainId);
+        const addressesFilePath = join(scriptDir, "./data/addresses.json");
 
         const contractAddressData: ContractAddressData = {
             token: tokenAddress.toString(),
             wormhole: wormholeAddress.toString(),
-            emitter: emitterAddress.toString(),
+            bridge: bridgeAddress.toString(),
             receiver: addresses[0].toString()
         }
 

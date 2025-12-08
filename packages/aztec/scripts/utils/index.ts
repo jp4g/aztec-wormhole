@@ -18,7 +18,7 @@ export type ContractAddressData = {
   receiver: string;
   wormhole: string;
   token: string;
-  emitter?: string;
+  bridge?: string;
 }
 
 export const getAccounts = async (

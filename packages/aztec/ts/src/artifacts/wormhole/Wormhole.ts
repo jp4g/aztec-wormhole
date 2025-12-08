@@ -216,9 +216,6 @@ current_guardian_set_index: {
     /** publish_message_in_private(nonce: integer, payloads: array, message_fee: integer, consistency: integer, from: struct, token_nonce: field) */
     publish_message_in_private: ((nonce: (bigint | number), payloads: (bigint | number)[][], message_fee: (bigint | number), consistency: (bigint | number), from: AztecAddressLike, token_nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** publish_message_in_private_flat(nonce: integer, payload_1: array, payload_2: array, payload_3: array, payload_4: array, payload_5: array, payload_6: array, payload_7: array, payload_8: array, message_fee: integer, consistency: integer, from: struct, token_nonce: field) */
-    publish_message_in_private_flat: ((nonce: (bigint | number), payload_1: (bigint | number)[], payload_2: (bigint | number)[], payload_3: (bigint | number)[], payload_4: (bigint | number)[], payload_5: (bigint | number)[], payload_6: (bigint | number)[], payload_7: (bigint | number)[], payload_8: (bigint | number)[], message_fee: (bigint | number), consistency: (bigint | number), from: AztecAddressLike, token_nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
-
     /** publish_message_in_public(nonce: integer, payloads: array, message_fee: integer, consistency: integer, from: struct, token_nonce: field) */
     publish_message_in_public: ((nonce: (bigint | number), payloads: (bigint | number)[][], message_fee: (bigint | number), consistency: (bigint | number), from: AztecAddressLike, token_nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 

@@ -19,7 +19,7 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "viem": "^2.27.0",
-    "@aztec-wormhole/contracts": "file:../aztec-contracts"
+    "@aztec-wormhole/contracts": "file:../aztec"
   },
   "devDependencies": {
     "@types/node": "^20",

@@ -108,9 +108,6 @@ fee: {
     /** bridge_out_private(recipient_address: array, amount: integer, bridge_nonce: field, fee_nonce: field) */
     bridge_out_private: ((recipient_address: (bigint | number)[], amount: (bigint | number), bridge_nonce: FieldLike, fee_nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
-    /** bridge_out_private_flat(recipient_address: array, amount: integer, bridge_nonce: field, fee_nonce: field) */
-    bridge_out_private_flat: ((recipient_address: (bigint | number)[], amount: (bigint | number), bridge_nonce: FieldLike, fee_nonce: FieldLike) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
-
     /** constructor(token_address: struct, wormhole_address: struct, chain_id: integer, fee: integer) */
     constructor: ((token_address: AztecAddressLike, wormhole_address: AztecAddressLike, chain_id: (bigint | number), fee: (bigint | number)) => ContractFunctionInteraction) & Pick<ContractMethod, 'selector'>;
 
