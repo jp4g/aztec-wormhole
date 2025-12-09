@@ -7,8 +7,8 @@ import { TOKEN_METADATA } from "../constants";
 import {
     WormholeContract,
     WormholeContractArtifact,
-    WormholeBridgeContract,
-    WormholeBridgeContractArtifact
+    TokenBridgeContract,
+    TokenBridgeContractArtifact
 } from "../artifacts";
 
 export async function deployTokenContract(
@@ -48,21 +48,29 @@ export async function deployWormholeContract(
         .deployed(opts.wait);
 }
 
-export async function deployWormholeBridgeContract(
+/**
+ * Deploy the TokenBridge contract
+ * @param wallet - The wallet to deploy with
+ * @param from - The deployer address (will be set as owner)
+ * @param wormholeAddress - The Wormhole contract address
+ * @param chainId - The Wormhole chain ID for this chain
+ * @param messageFee - The fee for Wormhole messages (in smallest unit)
+ * @param opts - Send and wait options
+ */
+export async function deployTokenBridgeContract(
     wallet: BaseWallet,
     from: AztecAddress,
-    tokenAddress: AztecAddress,
     wormholeAddress: AztecAddress,
-    chainId: bigint = 57n,
-    wormholeFee: bigint = 0n,
+    chainId: bigint = 56n,  // Default Aztec Wormhole chain ID
+    messageFee: bigint = 0n,
     opts: { send: SendInteractionOptions, wait?: WaitOpts } = { send: { from } }
-): Promise<WormholeBridgeContract> {
-    return await WormholeBridgeContract.deploy(
+): Promise<TokenBridgeContract> {
+    return await TokenBridgeContract.deploy(
         wallet,
-        tokenAddress,
         wormholeAddress,
         chainId,
-        wormholeFee
+        from,  // owner
+        messageFee
     )
         .send(opts.send)
         .deployed(opts.wait);
@@ -96,16 +104,16 @@ export async function getWormholeContract(
     return wormhole;
 }
 
-export async function getWormholeBridgeContract(
+export async function getTokenBridgeContract(
     wallet: BaseWallet,
     from: AztecAddress,
     node: AztecNode,
     address: AztecAddress
-): Promise<WormholeBridgeContract> {
+): Promise<TokenBridgeContract> {
     const instance = await node.getContract(address);
-    if (!instance) throw new Error(`Wormhole emitter contract instance at ${address.toString()} not found`);
-    await wallet.registerContract({ instance, artifact: WormholeBridgeContractArtifact });
-    const wormholeEmitter = await WormholeBridgeContract.at(address, wallet);
-    await wormholeEmitter.methods.sync_private_state().simulate({ from });
-    return wormholeEmitter;
+    if (!instance) throw new Error(`TokenBridge contract instance at ${address.toString()} not found`);
+    await wallet.registerContract({ instance, artifact: TokenBridgeContractArtifact });
+    const bridge = await TokenBridgeContract.at(address, wallet);
+    await bridge.methods.sync_private_state().simulate({ from });
+    return bridge;
 }

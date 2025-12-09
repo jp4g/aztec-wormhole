@@ -14,7 +14,7 @@ async function main() {
         // remove old artifacts
         await execCommand("rm", ["-rf", "target"]);
 
-        // compiling Wormhole Brige and Emitter Contracts
+        // compiling Wormhole and TokenBridge Contracts
         console.log("Starting compilation...");
         await execCommand(
             "aztec-nargo",
@@ -40,12 +40,12 @@ async function main() {
             join(artifactsDir, "wormhole", "Wormhole.json")
         );
         await copyFileWithLog(
-            "./target/WormholeBridge.ts",
-            join(artifactsDir, "bridge", "WormholeBridge.ts")
+            "./target/TokenBridge.ts",
+            join(artifactsDir, "bridge", "TokenBridge.ts")
         )
         await copyFileWithLog(
-            "./target/wormhole_bridge-WormholeBridge.json",
-            join(artifactsDir, "bridge", "WormholeBridge.json")
+            "./target/token_bridge-TokenBridge.json",
+            join(artifactsDir, "bridge", "TokenBridge.json")
         );
 
         // Update import paths
@@ -56,9 +56,9 @@ async function main() {
             "./Wormhole.json"
         );
         await replaceInFile(
-            join(artifactsDir, "bridge", "WormholeBridge.ts"),
-            "./wormhole_bridge-WormholeBridge.json",
-            "./WormholeBridge.json"
+            join(artifactsDir, "bridge", "TokenBridge.ts"),
+            "./token_bridge-TokenBridge.json",
+            "./TokenBridge.json"
         );
 
         console.log("Compiled artifacts and packed artifacts for export successfully!");

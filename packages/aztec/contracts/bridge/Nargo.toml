@@ -1,5 +1,5 @@
 [package]
-name = "wormhole_bridge"
+name = "token_bridge"
 type = "contract"
 authors = [""]
 

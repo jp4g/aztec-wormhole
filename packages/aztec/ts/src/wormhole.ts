@@ -44,6 +44,26 @@ export function hexAddressToUint8Array(hexAddress: string): Uint8Array {
     return addressBytes;
 }
 
+/**
+ * Convert an EVM address (20 bytes) to bytes32 format (32 bytes, left-padded with zeros)
+ * This is the standard Wormhole format for addresses.
+ */
+export function evmAddressToBytes32(hexAddress: string): number[] {
+    const normalized = hexAddress.startsWith('0x') ? hexAddress.slice(2) : hexAddress;
+    if (normalized.length !== 40) {
+        throw new Error(`Invalid address length: ${normalized.length} chars, expected 40`);
+    }
+
+    // Left-pad with 12 zero bytes, then 20 address bytes = 32 bytes total
+    const bytes32 = new Array(32).fill(0);
+    for (let i = 0; i < 20; i++) {
+        const byteHex = normalized.substring(i * 2, i * 2 + 2);
+        bytes32[12 + i] = parseInt(byteHex, 16);  // Start at index 12
+    }
+
+    return bytes32;
+}
+
 function chainIdToUint8Array(chainId: number): Uint8Array {
     if (!Number.isInteger(chainId) || chainId < 0) {
         throw new Error(`Invalid chain id: ${chainId}`);

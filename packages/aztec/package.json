@@ -51,6 +51,7 @@
     "mint": "bun run ./scripts/mint.ts",
     "setup:accounts": "bun run ./scripts/setupAccounts.ts",
     "setup:deploy": "bun run ./scripts/deploy.ts",
+    "setup:configure": "bun run ./scripts/configure.ts",
     "bridge:out": "bun run ./scripts/bridge.ts"
   }
 }

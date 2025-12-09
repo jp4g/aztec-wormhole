@@ -1,45 +1,66 @@
 services:
-  anvil:
-    container_name: anvil-ethereum-node
-    image: aztecprotocol/aztec:3.0.0-devnet.3
-    ports:
-      - "8545:8545"
-    entrypoint: ["/bin/bash", "-c"]
+  # Wormhole Spy - monitors guardian network for VAAs
+  wormhole-spy:
+    image: ghcr.io/wormhole-foundation/guardiand:latest
+    platform: linux/amd64
+    entrypoint: /guardiand
     command:
-      - |
-        anvil --host 0.0.0.0 --silent --fork-url https://sepolia-rollup.arbitrum.io/rpc --fork-block-number 212475616 --chain-id 31337
-    restart: unless-stopped
-    networks:
-      - aztec-network
-  aztec-sandbox-node:
-    container_name: aztec-sandbox-node
-    image: aztecprotocol/aztec:3.0.0-devnet.3
+      - spy
+      - --nodeKey
+      - /node.key
+      - --spyRPC
+      - "[::]:7073"
+      - --env
+      - testnet
     ports:
-      - "8080:8080"
-      - "40400:40400"
-      - "40400:40400/udp"
+      - "7073:7073"
+    networks:
+      - bridge-network
+
+  # Relayer for Aztec -> EVM (listens for Aztec VAAs, submits to Arbitrum)
+  relayer-to-evm:
+    build:
+      context: ./packages/relayer
+      dockerfile: Dockerfile
+    command: ["evm"]
     environment:
-      - L1_CHAIN_ID=31337
-      - ETHEREUM_HOSTS=http://anvil:8545
-      - AZTEC_PORT=8080
-      - P2P_PORT=40400
-      - NO_PXE=true
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --sandbox
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/status"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      # Wormhole Spy
+      - SPY_RPC_HOST=wormhole-spy:7073
+      # Source chain (Aztec)
+      - CHAIN_ID=56
+      # EVM target
+      - EVM_RPC_URL=${ARBITRUM_RPC_URL:-https://sepolia-rollup.arbitrum.io/rpc}
+      - EVM_TARGET_CONTRACT=${EVM_BRIDGE_ADDRESS}
+      - PRIVATE_KEY=${PRIVATE_KEY}
     depends_on:
-      - anvil
-    restart: unless-stopped
+      - wormhole-spy
     networks:
-      - aztec-network
+      - bridge-network
+    restart: unless-stopped
+
+  # Relayer for EVM -> Aztec (listens for Arbitrum VAAs, submits to Aztec)
+  relayer-to-aztec:
+    build:
+      context: ./packages/relayer
+      dockerfile: Dockerfile
+    command: ["aztec"]
+    environment:
+      # Wormhole Spy
+      - SPY_RPC_HOST=wormhole-spy:7073
+      # Source chain (Arbitrum Sepolia)
+      - CHAIN_ID=10003
+      # Aztec target
+      - AZTEC_PXE_URL=${L2_NODE_URL:-https://devnet.aztec-labs.com}
+      - AZTEC_WALLET_ADDRESS=${AZTEC_RECEIVER_ADDRESS}
+      - AZTEC_TARGET_CONTRACT=${AZTEC_BRIDGE_ADDRESS}
+      # Optional verification service (if running separately)
+      - VERIFICATION_SERVICE_URL=${VERIFICATION_SERVICE_URL:-}
+    depends_on:
+      - wormhole-spy
+    networks:
+      - bridge-network
+    restart: unless-stopped
 
 networks:
-  aztec-network:
+  bridge-network:
     driver: bridge

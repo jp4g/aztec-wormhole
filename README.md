@@ -94,50 +94,199 @@ Before you begin, ensure you have the following installed:
 
    This will install dependencies for all packages in the monorepo.
 
-## 🛠️ Development
+## 🛠️ Local Development (Sandbox)
 
-### Running All Packages
+### 1. Start the Sandbox
 
-To start all development servers in parallel:
-
-```bash
-npm run dev
-```
-
-This will start:
-- **Frontend** at `http://localhost:3000`
-- **Relayer** service (if configured)
-- Any other configured services
-
-### Running Specific Packages
-
-To run only the frontend:
+Start the local Aztec sandbox with a forked Anvil node:
 
 ```bash
-cd packages/frontend
-npm run dev
+# From project root
+docker compose up
 ```
 
-Or using Turborepo filters:
+This starts:
+- **Anvil** on `localhost:8545` (forked from Arbitrum Sepolia)
+- **Aztec Node** on `localhost:8080`
+
+### 2. Configure Environment
 
 ```bash
-npx turbo run dev --filter=aztec-wormhole-demo-frontend
+cd packages/aztec
+cp .example.env .env
 ```
 
-### Building
+Edit `.env` for sandbox:
+```env
+L1_RPC_URL=http://localhost:8545
+L2_NODE_URL=http://localhost:8080
+```
 
-Build all packages:
+### 3. Compile & Deploy Aztec Contracts
 
 ```bash
-npm run build
+cd packages/aztec
+
+# Install dependencies
+bun install
+
+# Compile Noir contracts to TypeScript artifacts
+bun run build:contracts
+
+# Set up accounts (creates wallets)
+bun run setup:accounts
+
+# Deploy Token, Wormhole, and TokenBridge contracts
+bun run setup:deploy
 ```
 
-Build specific package:
+### 4. Compile & Deploy EVM Contracts
 
 ```bash
-cd packages/frontend
-npm run build
+cd packages/evm
+
+# Install forge dependencies and build
+bun run build
+
+# Run tests
+bun run test
 ```
+
+## 🚀 Testnet Deployment
+
+### Aztec Testnet (Devnet)
+
+```bash
+cd packages/aztec
+cp .example.env .env
+```
+
+Edit `.env` for testnet:
+```env
+L1_RPC_URL=https://eth-sepolia.public.blastapi.io
+L2_NODE_URL=https://devnet.aztec-labs.com
+```
+
+Deploy:
+```bash
+bun run build:contracts
+bun run setup:accounts
+bun run setup:deploy
+```
+
+### EVM (Arbitrum Sepolia)
+
+```bash
+cd packages/evm
+cp env.example .env
+```
+
+Edit root `.env` with your private key:
+```env
+PRIVATE_KEY=0x...your_private_key...
+```
+
+Deploy:
+```bash
+source .env
+forge script script/DeployTokenBridge.s.sol \
+  --rpc-url arbitrum_sepolia \
+  --broadcast
+```
+
+### Configure Both Bridges
+
+After deploying both sides, configure the bridges to trust each other:
+
+```bash
+cd packages/aztec
+bun run setup:configure
+```
+
+This will register emitters on both Aztec and EVM sides automatically.
+
+Optional environment overrides:
+```env
+WORMHOLE_ADDRESS=0x...          # Override Wormhole Core address
+WORMHOLE_CHAIN_ID=10003         # Wormhole chain ID
+AZTEC_EMITTER_ADDRESS=0x...     # Aztec bridge address to register
+DEPLOY_TEST_TOKEN=true          # Deploy a test BridgedToken
+```
+
+### Post-Deployment Configuration
+
+After deploying both bridges, run the configure script to register emitters on both sides:
+
+```bash
+cd packages/aztec
+
+# This registers:
+# - EVM bridge as trusted emitter on Aztec
+# - Aztec bridge as trusted emitter on EVM
+# - Sets up remote token mappings (if EVM_TOKEN_ADDRESS is set)
+bun run setup:configure
+```
+
+The configure script reads addresses from the root `.env` file (auto-populated by deploy scripts) and:
+1. Registers the EVM TokenBridge as a trusted emitter on Aztec (chain ID 10003)
+2. Registers the Aztec TokenBridge as a trusted emitter on EVM (chain ID 56)
+3. Optionally sets up remote token mappings if `EVM_TOKEN_ADDRESS` is configured
+
+**Manual configuration (if needed):**
+```typescript
+// On Aztec side
+await registerEmitter(wallet, from, bridgeContract, 10003, evmBridgeAddressBytes, opts);
+await setRemoteToken(wallet, from, bridge, localToken, 10003, evmTokenBytes, true, opts);
+
+// On EVM side (via cast or contract call)
+cast send $EVM_BRIDGE "registerEmitter(uint16,bytes32)" 56 $AZTEC_BRIDGE_BYTES32
+bridge.setRemoteToken(localToken, 56, aztecTokenBytes, true);
+```
+
+## 📋 Contract Addresses
+
+### Aztec Testnet (Official Wormhole Deployment)
+| Contract | Address |
+|----------|---------|
+| Wormhole | `0x2b13cff4daef709134419f1506ccae28956e02102a5ef5f2d0077e4991a9f493` |
+| Token | `0x063cb1ad6d818724574328352263cbc8ae38c8c3d5b1ae3e0c0dcc1e58d772ac` |
+| TokenBridge | `0x12216055e8771f01db45d2b0282ae81298a2c0d1125e76da42aff0fa228fc642` |
+
+### Arbitrum Sepolia
+| Contract | Address |
+|----------|---------|
+| Wormhole Core | `0x6b9C8671cdDC8dEab9c719bB87cBd3e782bA6a35` |
+| TokenBridge | `0xf35a71868f2c6649277bcb8993eb0338484deef8` |
+
+### Chain IDs
+| Chain | Wormhole Chain ID |
+|-------|-------------------|
+| Aztec | 56 |
+| Arbitrum Sepolia | 10003 |
+
+## 🔧 Available Scripts
+
+### Aztec Package (`packages/aztec`)
+
+| Script | Description |
+|--------|-------------|
+| `bun run build:contracts` | Compile Noir contracts to TypeScript |
+| `bun run build:ts` | Build TypeScript library |
+| `bun run build` | Full build (contracts + TypeScript) |
+| `bun run setup:accounts` | Create wallet accounts |
+| `bun run setup:deploy` | Deploy all contracts (updates root .env) |
+| `bun run setup:configure` | Register emitters on both Aztec and EVM |
+| `bun run mint` | Mint tokens |
+| `bun run bridge:out` | Bridge tokens to EVM |
+
+### EVM Package (`packages/evm`)
+
+| Script | Description |
+|--------|-------------|
+| `bun run build` | Install deps + compile contracts |
+| `bun run test` | Run forge tests |
+| `bun run lint` | Check formatting |
+| `bun run clean` | Clean build artifacts |
 
 ## 📚 Package Details
 
@@ -241,6 +390,46 @@ These artifacts are imported by the frontend scripts (`deploy.mjs`, `send-messag
 - Monitors Wormhole spy service
 
 Handles bidirectional message passing between Aztec and Arbitrum networks.
+
+**Commands:**
+- `evm` - Relay VAAs from Aztec (chain 56) to EVM chains
+- `aztec` - Relay VAAs from EVM chains (chain 10003) to Aztec
+
+**Running Locally:**
+```bash
+cd packages/relayer
+
+# Build
+go build -o wormhole-relayer .
+
+# Run Aztec -> EVM relay
+./wormhole-relayer evm --private-key $PRIVATE_KEY
+
+# Run EVM -> Aztec relay
+./wormhole-relayer aztec
+```
+
+**Running with Docker:**
+```bash
+# Start all services (spy + both relayers)
+docker compose up -d
+
+# View logs
+docker compose logs -f relayer-to-evm
+docker compose logs -f relayer-to-aztec
+```
+
+**Environment Variables:**
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SPY_RPC_HOST` | Wormhole spy service | `localhost:7073` |
+| `CHAIN_ID` | Source chain to filter | `56` (Aztec) or `10003` (Arb) |
+| `EVM_RPC_URL` | Arbitrum RPC endpoint | `https://sepolia-rollup.arbitrum.io/rpc` |
+| `EVM_TARGET_CONTRACT` | TokenBridge on EVM | - |
+| `PRIVATE_KEY` | EVM wallet private key | - |
+| `AZTEC_PXE_URL` | Aztec PXE endpoint | `https://devnet.aztec-labs.com/` |
+| `AZTEC_TARGET_CONTRACT` | TokenBridge on Aztec | - |
+| `AZTEC_WALLET_ADDRESS` | Aztec wallet address | - |
 
 ## 🔧 Configuration
 

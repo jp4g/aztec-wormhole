@@ -1,2 +1,2 @@
-export { WormholeBridgeContract, WormholeBridgeContractArtifact} from "./bridge/WormholeBridge";
+export { TokenBridgeContract, TokenBridgeContractArtifact} from "./bridge/TokenBridge";
 export { WormholeContract, WormholeContractArtifact} from "./wormhole/Wormhole";

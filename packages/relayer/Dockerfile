@@ -1,11 +1,10 @@
 # Build stage
-FROM golang:1.24.1-alpine AS builder
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates
-
-# Set working directory
-WORKDIR /app
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -16,19 +15,22 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o relayer .
+# Build the binary
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o wormhole-relayer .
 
-# Final stage
-FROM alpine:latest
+# Runtime stage
+FROM alpine:3.19
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+WORKDIR /app
 
-WORKDIR /root/
+# Install ca-certificates for HTTPS
+RUN apk add --no-cache ca-certificates
 
-# Copy the binary from builder
-COPY --from=builder /app/relayer .
+# Copy binary from builder
+COPY --from=builder /app/wormhole-relayer .
 
-# Run the relayer
-CMD ["./relayer"]
+# Create non-root user
+RUN adduser -D -g '' relayer
+USER relayer
+
+ENTRYPOINT ["./wormhole-relayer"]
